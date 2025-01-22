@@ -1,6 +1,6 @@
 const fqdn = 'https://allen-blog-omega.vercel.app';
 const logoPath = '/logo.jpg';
-const bannerPath = '/og.jpg';
+const bannerPath = '/og-image.jpg';
 
 export const siteConfigs = {
   title: 'Allen Blog',
