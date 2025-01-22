@@ -1,4 +1,4 @@
-const fqdn = 'https://nextjs-tailwind-contentlayer-blog-starter.vercel.app';
+const fqdn = 'https://allen-blog-omega.vercel.app';
 const logoPath = '/logo.jpg';
 const bannerPath = '/og.jpg';
 
