@@ -4,7 +4,7 @@ import Facebook from './facebook.svg';
 import Github from './github.svg';
 import Linkedin from './linkedin.svg';
 import Mail from './mail.svg';
-import Twitter from './twitter.svg';
+import Ig from './ig.svg';
 
 // Icons taken from: https://simpleicons.org/
 
@@ -15,11 +15,11 @@ const components: { [key: string]: SVGComponent } = {
   github: Github as SVGComponent,
   facebook: Facebook as SVGComponent,
   linkedin: Linkedin as SVGComponent,
-  twitter: Twitter as SVGComponent,
+  ig: Ig as SVGComponent,
 };
 
 type Props = {
-  kind: 'mail' | 'github' | 'facebook' | 'linkedin' | 'twitter';
+  kind: 'mail' | 'github' | 'facebook' | 'linkedin' | 'ig';
   href: string;
 };
 
@@ -51,7 +51,7 @@ const SocialIcon = ({ kind, href }: Props) => {
             'hover:text-[#4267B2] dark:hover:text-[#4267B2]',
           kind === 'linkedin' &&
             'hover:text-[#0e76a8] dark:hover:text-[#0e76a8]',
-          kind === 'twitter' && 'hover:text-[#1DA1F2] dark:hover:text-[#1DA1F2]'
+          kind === 'ig' && 'hover:text-[#1DA1F2] dark:hover:text-[#1DA1F2]'
         )}
       />
     </a>

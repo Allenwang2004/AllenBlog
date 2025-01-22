@@ -20,7 +20,7 @@ export default function Footer() {
             kind="linkedin"
             href={footerConfigs.socialLinks.linkedin}
           />
-          <SocialIcon kind="twitter" href={footerConfigs.socialLinks.twitter} />
+          <SocialIcon kind="ig" href={footerConfigs.socialLinks.ig} />
         </div>
         <div className="mb-8 flex space-x-2 text-sm text-gray-500 transition-colors dark:text-gray-400">
           <div>{`Copyright © 2015 - ${new Date().getFullYear()}`}</div>
