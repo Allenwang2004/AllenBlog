@@ -3,10 +3,10 @@ const logoPath = '/logo.jpg';
 const bannerPath = '/og-image.jpg';
 
 export const siteConfigs = {
-  title: 'Allen Blog',
+  title: "Allen's Blog",
   titleShort: 'Next Blog',
   description:
-    'Allen Blog',
+    "Allen's Blog",
   author: 'Allenwang',
   credit: 'Allenwang',
   email: 'ziyiw1930@gmail.com',
