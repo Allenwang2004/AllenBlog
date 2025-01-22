@@ -3,10 +3,10 @@ const logoPath = '/logo.png';
 const bannerPath = '/og-image.png';
 
 export const siteConfigs = {
-  title: 'Next.js Tailwind Contentlayer Blog Starter',
+  title: 'Allen Blog',
   titleShort: 'Next Blog',
   description:
-    'Blog starter template with modern frontend technologies like Next.js, Tailwind CSS, Contentlayer, i18Next',
+    'Allen Blog',
   author: 'Allenwang',
   credit: 'Allenwang',
   email: 'ziyiw1930@gmail.com',
