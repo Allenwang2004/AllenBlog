@@ -1,0 +1,78 @@
+---
+title: Allagent
+description: AI assistant platform
+slug: Allagent-post
+date: 2025-01-20
+type: Post
+---
+
+**AI 助理開發平台**
+
+---
+
+### 一、主要目標
+
+打造一個基於 Web 的 AI 助理開發平台 MVP，可執行 RAG 查詢、執行 LLM 問答，擁有簡易式的 Web Chat UI 和短接線的知識庫管理效能。
+
+---
+
+### 二、基本功能模組 (Phase 1)
+
+1. **Chat UI 前端**
+   - React (Next.js) + TailwindCSS
+   - 使用 socket.io or REST API 連線
+   - 支援 Markdown 格式回覆、貼上檔案
+
+2. **背後 API**
+   - FastAPI / Flask
+   - JWT 用戶驗證
+   - Endpoint:
+     - `/chat`: 接受問題、經 RAG 處理后返回 LLM 答案
+     - `/upload`: 上傳文件 (對應知識庫)
+
+3. **RAG + LLM 問答**
+   - `LangChain` 處理:
+     - DocumentLoader -> TextSplitter -> Embedding (OpenAI / HuggingFace)
+   - 向量庫: FAISS
+   - LLM: OpenAI GPT-4o or Claude-3.5 作為試算
+
+4. **管理後台 (簡易版)**
+   - 許可查看已上傳文件與完成實例
+   - 背後可監控問答次數 / 回覆時間
+
+---
+
+### 三、開發工作流程
+
+1. **執行環境**
+   - Python 3.10+
+   - Node.js 18+
+   - 設置 `.env` (包含 API key, DB 設定)
+
+2. **轉文經營 & 向量庫構建**
+   - PDF/Word 文件上傳 -> text split -> embedding -> FAISS 
+
+3. **對話系統上線**
+   - 首頁 Chat UI + backend 使用 Socket or REST 連線
+
+4. **LLM 使用模式**
+   - OpenAI GPT-4o / Claude 3.5 先為體驗版格
+
+5. **MVP 上線測試**
+   - 部局上線 Heroku / Render / EC2
+
+---
+
+### 四、未來擴充 (推薦 Phase 2+)
+
+- 支援官方 LINE bot / Messenger bot
+- 文本通訊分析 (大量實例 log analysis)
+- TTS / STT (聲音對話)
+- Plugin 式 Function Calling / API Agent
+- 多人語境、不同角色助理分辨
+
+---
+
+
+
+---

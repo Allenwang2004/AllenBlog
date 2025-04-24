@@ -4,7 +4,7 @@ import Facebook from './facebook.svg';
 import Github from './github.svg';
 import Linkedin from './linkedin.svg';
 import Mail from './mail.svg';
-import Ig from './ig.svg';
+import Ig from './instagram.svg';
 
 // Icons taken from: https://simpleicons.org/
 
@@ -51,7 +51,7 @@ const SocialIcon = ({ kind, href }: Props) => {
             'hover:text-[#4267B2] dark:hover:text-[#4267B2]',
           kind === 'linkedin' &&
             'hover:text-[#0e76a8] dark:hover:text-[#0e76a8]',
-          kind === 'ig' && 'hover:text-[#1DA1F2] dark:hover:text-[#1DA1F2]'
+          kind === 'ig' && 'hover:text-[#FF0069] dark:hover:text-[#FF0069]'
         )}
       />
     </a>
