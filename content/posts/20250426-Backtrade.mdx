@@ -1,0 +1,44 @@
+---
+title: Backtrade
+description: Backtesting sysytem of CTA strategies on crypto currency
+slug: backtrade-post
+date: 2025-04-01
+type: Post
+---
+
+**量化策略回測框架 [Github](<https://github.com/Allenwang2004/Backtrade>)**
+
+---
+
+### 一、主要目標
+
+基於時長從 1分k 到 4小時k 的交易策略進行回測
+
+---
+
+### 二、基本模組 (Phase 1)
+
+1. **Strtegy**
+   - 進出場點邏輯
+   - 下單種類(市價單、限價單、附加訂單...)
+   - 支援多策略
+   - 使用optuna做參數優化
+
+2. **Broker**
+   - 模擬搓合(根據成交量)
+
+3. **Quantstate**
+   - 績效指標
+   - 每月報酬
+
+4. **進場點位**
+   - 使用bokeh繪製進出場點位
+
+---
+
+### 三、未來擴充 (推薦 Phase 2+)
+
+- Datafeed 直接對接交易所 API
+- 使用tick等級的資料做模擬搓合
+
+---

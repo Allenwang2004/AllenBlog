@@ -1,0 +1,39 @@
+---
+title: Livetrade
+description: Live-trading sysytem of CTA strategies on crypto currency
+slug: livetrade-post
+date: 2025-04-26
+type: Post
+---
+
+### 一、主要目標
+
+全自動的交易系統
+
+---
+
+### 二、基本模組 (Phase 1)
+
+1. **Datawarehouse**
+   - websocket live stream 收集資料
+   - 根據資料產出 Alpha
+
+2. **Strategy**
+   - 根據 Alpha 做出交易決策
+   - 使用 Line bot 通知
+
+3. **Order＆ Risk Manager**
+   - 管理訂單
+   - 控制倉位
+
+4. **Portfolio Manager**
+   - 追蹤績效並使用 Grafana 呈現
+
+---
+
+### 三、未來擴充 (推薦 Phase 2+)
+
+- 持續擴展交易策略
+- 連接 Backtrade 自動下架回測表現不佳的策略
+
+---
