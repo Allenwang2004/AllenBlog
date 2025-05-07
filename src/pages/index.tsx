@@ -1,9 +1,12 @@
+import { useEffect, useState } from 'react';
+import { useTheme } from 'next-themes';
+import dynamic from 'next/dynamic';
 import type { NextPage } from 'next';
 import { GetStaticProps } from 'next';
 import { useTranslation } from 'next-i18next';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import { ArticleJsonLd } from 'next-seo';
-import GalaxyBackground from '@/components/GalaxyBackground';
+import EmailSubscribeForm from '@/components/EmailSubscribeForm';
 
 import {
   getCommandPalettePosts,
@@ -15,6 +18,10 @@ import PostList, { PostForPostList } from '@/components/PostList';
 import { siteConfigs } from '@/configs/siteConfigs';
 import { allPostsNewToOld } from '@/lib/contentLayerAdapter';
 import generateRSS from '@/lib/generateRSS';
+
+const GalaxyBackground = dynamic(() => import('@/components/GalaxyBackground'), {
+  ssr: false,
+});
 
 type PostForIndexPage = PostForPostList;
 
@@ -48,12 +55,17 @@ export const getStaticProps: GetStaticProps<Props> = async (context) => {
 
 const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
   const { t } = useTranslation(['indexPage', 'common']);
+  const { theme } = useTheme();
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useCommandPalettePostActions(commandPalettePosts);
 
   return (
     <LayoutPerPage>
-      <GalaxyBackground /> 
+      {mounted && theme === 'dark' && <GalaxyBackground />}
+
       <div style={{ position: 'relative', zIndex: 10 }}>
         <ArticleJsonLd
           type="Blog"
@@ -79,7 +91,17 @@ const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
 
           <PostList posts={posts} />
         </div>
-        </div>
+      <div className="prose prose-lg my-16 mx-auto text-center dark:prose-dark max-w-3xl">
+            <a
+              href="/resume"
+              className="inline-block mt-4 px-6 py-3 font-medium rounded border border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-500 dark:text-gray-200 dark:hover:bg-gray-800 transition"
+            >
+              Experience
+            </a>
+      </div>
+      </div>
+      {/*<EmailSubscribeForm />*/}
+      
     </LayoutPerPage>
   );
 };
