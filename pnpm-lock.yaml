@@ -19,7 +19,7 @@ importers:
         version: 1.2.1
       contentlayer:
         specifier: ^0.2.7
-        version: 0.2.9(esbuild@0.15.18)
+        version: 0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0)
       date-fns:
         specifier: ^2.29.2
         version: 2.30.0
@@ -35,12 +35,15 @@ importers:
       kbar:
         specifier: 0.1.0-beta.36
         version: 0.1.0-beta.36(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      markdown-wasm:
+        specifier: ^1.2.0
+        version: 1.2.0
       next:
         specifier: 12.2.5
         version: 12.2.5(@babel/core@7.27.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(sass@1.87.0)
       next-contentlayer:
         specifier: ^0.2.7
-        version: 0.2.9(esbuild@0.15.18)(next@12.2.5(@babel/core@7.27.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(sass@1.87.0))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0)(next@12.2.5(@babel/core@7.27.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(sass@1.87.0))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       next-i18next:
         specifier: ^12.1.0
         version: 12.1.0(next@12.2.5(@babel/core@7.27.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(sass@1.87.0))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -2997,6 +3000,9 @@ packages:
     resolution: {integrity: sha512-WWC0ZuMzCyDHYCasEGs4IPvLyTGftYwh6wIEOULOF0HXcqZlhwRzrK0w2VUlxWA98xnvb/jszw4ZSkJ6ADpM6Q==}
     engines: {node: '>=0.10.0'}
 
+  markdown-wasm@1.2.0:
+    resolution: {integrity: sha512-S12OTkyXCkOgI1n1rZY9cg4bK/PGu80Emjpvwp8BEjwCxhPV3yddF0U6+QhCitdBsI1tzWcoeahmW7k0Pq81OA==}
+
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
@@ -4934,9 +4940,9 @@ snapshots:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.27.1
 
-  '@contentlayer/cli@0.2.9(esbuild@0.15.18)':
+  '@contentlayer/cli@0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0)':
     dependencies:
-      '@contentlayer/core': 0.2.9(esbuild@0.15.18)
+      '@contentlayer/core': 0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0)
       '@contentlayer/utils': 0.2.9
       clipanion: 3.2.1(typanion@3.14.0)
       typanion: 3.14.0
@@ -4946,16 +4952,16 @@ snapshots:
       - markdown-wasm
       - supports-color
 
-  '@contentlayer/client@0.2.9(esbuild@0.15.18)':
+  '@contentlayer/client@0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0)':
     dependencies:
-      '@contentlayer/core': 0.2.9(esbuild@0.15.18)
+      '@contentlayer/core': 0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0)
     transitivePeerDependencies:
       - '@effect-ts/otel-node'
       - esbuild
       - markdown-wasm
       - supports-color
 
-  '@contentlayer/core@0.2.9(esbuild@0.15.18)':
+  '@contentlayer/core@0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0)':
     dependencies:
       '@contentlayer/utils': 0.2.9
       camel-case: 4.1.2
@@ -4971,13 +4977,14 @@ snapshots:
       unified: 10.1.2
     optionalDependencies:
       esbuild: 0.15.18
+      markdown-wasm: 1.2.0
     transitivePeerDependencies:
       - '@effect-ts/otel-node'
       - supports-color
 
-  '@contentlayer/source-files@0.2.9(esbuild@0.15.18)':
+  '@contentlayer/source-files@0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0)':
     dependencies:
-      '@contentlayer/core': 0.2.9(esbuild@0.15.18)
+      '@contentlayer/core': 0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0)
       '@contentlayer/utils': 0.2.9
       chokidar: 3.6.0
       fast-glob: 3.3.3
@@ -6059,12 +6066,12 @@ snapshots:
 
   concat-map@0.0.1: {}
 
-  contentlayer@0.2.9(esbuild@0.15.18):
+  contentlayer@0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0):
     dependencies:
-      '@contentlayer/cli': 0.2.9(esbuild@0.15.18)
-      '@contentlayer/client': 0.2.9(esbuild@0.15.18)
-      '@contentlayer/core': 0.2.9(esbuild@0.15.18)
-      '@contentlayer/source-files': 0.2.9(esbuild@0.15.18)
+      '@contentlayer/cli': 0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0)
+      '@contentlayer/client': 0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0)
+      '@contentlayer/core': 0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0)
+      '@contentlayer/source-files': 0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0)
       '@contentlayer/utils': 0.2.9
     transitivePeerDependencies:
       - '@effect-ts/otel-node'
@@ -7429,6 +7436,8 @@ snapshots:
 
   markdown-extensions@1.1.1: {}
 
+  markdown-wasm@1.2.0: {}
+
   math-intrinsics@1.1.0: {}
 
   mdast-util-definitions@5.1.2:
@@ -7809,9 +7818,9 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  next-contentlayer@0.2.9(esbuild@0.15.18)(next@12.2.5(@babel/core@7.27.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(sass@1.87.0))(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
+  next-contentlayer@0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0)(next@12.2.5(@babel/core@7.27.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(sass@1.87.0))(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
     dependencies:
-      '@contentlayer/core': 0.2.9(esbuild@0.15.18)
+      '@contentlayer/core': 0.2.9(esbuild@0.15.18)(markdown-wasm@1.2.0)
       '@contentlayer/utils': 0.2.9
       next: 12.2.5(@babel/core@7.27.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(sass@1.87.0)
       react: 18.2.0
