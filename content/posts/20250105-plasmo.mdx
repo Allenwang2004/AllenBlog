@@ -8,15 +8,64 @@ type: Post
 
 # Mouse Tracker Extension - Plasmo
 
-這是一個使用 [Plasmo Framework](https://docs.plasmo.com/) 所製作的瀏覽器擴充功能，能夠 **追蹤使用者滑鼠在網頁上的停留位置與時間**，並可透過彈出視窗匯出追蹤資料。
+這是一個使用 [Plasmo Framework](https://docs.plasmo.com/) 所開發的瀏覽器擴充功能，用於追蹤使用者滑鼠在網頁上的行為。  
+擴充功能能即時記錄滑鼠移動、停留位置與持續時間，並支援匯出為 JSON 檔案，適合用於使用者行為分析、UX 優化或互動熱區研究。
 
 ---
 
-## 功能特色
+## 📌 功能特色
 
-- 追蹤滑鼠移動與停留座標
-- 偵測滑鼠在某點停留超過 2 秒即記錄
-- 自動儲存追蹤資料至 local storage
-- 支援一鍵匯出成 JSON 檔案
+- 🖱 **滑鼠移動追蹤**  
+  實時監測滑鼠在畫面中的移動軌跡與座標紀錄
+
+- ⏱ **停留時間偵測**  
+  當滑鼠在同一點停留超過 **2 秒**，自動記錄該位置與時間戳
+
+- 💾 **本地儲存**  
+  所有紀錄自動儲存至 `localStorage`，關閉頁面後仍保留資料
+
+- 📤 **一鍵匯出 JSON 檔案**  
+  透過 popup UI 提供匯出按鈕，下載所有追蹤資料（含時間戳與座標）
+
+- 🧩 **Plasmo 開發架構**  
+  使用 Plasmo 快速構建 extension，支援熱重載與 TypeScript 開發體驗
 
 ---
+
+## 🧱 技術架構
+
+- **前端框架**：Plasmo + React + TypeScript
+- **滑鼠事件監聽**：`mousemove`、`mouseenter`、`mouseleave`
+- **資料儲存**：`localStorage`
+- **匯出功能**：Blob + anchor `download` 實現 JSON 匯出
+
+---
+
+## 🖼 使用情境
+
+- 🔍 **使用者體驗分析（UX Research）**
+- 🔥 **網頁熱區視覺化（可搭配 heatmap 分析）**
+- 📊 **設計 A/B 測試中點擊與滑動差異**
+- 🧪 **教育研究中觀察使用者注意力**
+
+---
+
+## 🚀 未來擴充方向（Phase 2+）
+
+- 📅 加入「使用者會話管理」：每一段追蹤資料加上唯一 Session ID
+- 🌐 支援跨頁面滑鼠行為整合（透過 background + storage sync）
+- 🔐 匿名化使用者 ID（可與 GA / Matomo 整合）
+- 📈 結合 heatmap 圖表呈現（如 heatmap.js）
+- ☁️ 支援匯出至後端 API（上傳伺服器）
+
+---
+
+## 📎 開發者參考連結
+
+- [Plasmo Docs](https://docs.plasmo.com/)
+- [MouseEvent MDN](https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent)
+- [Blob + JSON 下載技巧](https://developer.mozilla.org/en-US/docs/Web/API/Blob)
+
+---
+
+此專案適合 UX 設計師、前端開發者、資料分析師作為快速蒐集使用者互動資料的工具平台。如需示範影片、原始碼或部署步驟，也可至 GitHub 專案查看。

@@ -6,47 +6,104 @@ date: 2025-01-20
 type: Post
 ---
 
-**AI 助理開發平台 [Github demo](<https://github.com/Allenwang2004/Allagent>)**
+# Allagent：AI 助理開發平台（支援 RAG）
+
+**AI 助理開發平台 [GitHub Demo](https://github.com/Allenwang2004/Allagent)**  
+Allagent 是一個可擴展的 Web 型 AI 助理平台，整合 RAG（Retrieval-Augmented Generation）與 LLM 問答機制，提供簡潔易用的聊天介面與可自訂的知識庫上傳、管理能力。平台可應用於企業內知識問答、客服系統、專案導讀等多種場景。
 
 ---
 
-### 一、主要目標
+## 一、主要目標
 
-打造一個基於 Web 的 AI 助理開發平台，可執行 RAG 查詢、執行 LLM 問答，擁有簡易式的 Web Chat UI 和短接線的知識庫管理效能。
-
----
-
-### 二、基本功能模組 (Phase 1)
-
-1. **UI 前端**
-   - React (Next.js) + TailwindCSS
-   - 使用 Flask 連線
-   - 支援問答
-   - 文件上傳
-
-2. **背後 API**
-   - Flask
-   - Endpoint:
-     - `/chat`: 接受問題、經 RAG 處理后返回 LLM 答案
-     - `/upload`: 上傳文件 (對應知識庫)
-
-3. **RAG + LLM 問答**
-   - `LangChain` 處理:
-     - DocumentLoader -> TextSplitter -> Embedding (OpenAI / HuggingFace)
-   - 向量庫: FAISS
-   - LLM: Ollma
-
-4. **後台**
-   - 存放已上傳的資料
+- 建立一個基於 Web 的 AI 助理平台，支援 **文件知識檢索 + LLM 回答整合（RAG）**
+- 提供簡單易用的 **Chat UI**，供使用者直接輸入提問並獲得回應
+- 支援 **文件上傳作為知識庫來源**，後端自動處理切詞、嵌入與儲存
+- 可快速部署並串接各式應用（如企業內部系統、對外客服、教學平台）
 
 ---
 
-### 三、未來擴充 (推薦 Phase 2+)
+## 二、基本功能模組（Phase 1）
 
-- 支援官方 LINE bot / Messenger bot
-- 文本通訊分析 (大量實例 log analysis)
-- TTS / STT (聲音對話)
-- Plugin 式 Function Calling / API Agent
-- 多人語境、不同角色助理分辨
+### 1. UI 前端
+
+- 框架：`React` + `Next.js` + `TailwindCSS`
+- 主要功能：
+  - Chat 視窗介面（支援使用者問答）
+  - 檔案上傳（觸發後端知識庫更新）
+- 與後端連接方式：`Flask REST API`
+- 可擴展性：
+  - 支援角色選擇 / 模型切換
+  - 支援 Markdown / 富文字回應顯示
+
+### 2. 後端 API（Flask）
+
+- 框架：`Flask`
+- 主要 Endpoint：
+  - `POST /chat`:  
+    - 接收使用者輸入問題
+    - 觸發 RAG 過程 → 回傳 LLM 回答
+  - `POST /upload`:  
+    - 上傳 PDF / TXT / DOCX 檔案
+    - 處理後更新向量資料庫（即時或排程）
+
+### 3. RAG + LLM 問答流程
+
+- **RAG Pipeline**（使用 [`LangChain`](https://www.langchain.com/)）：
+  - `DocumentLoader` → `TextSplitter` → `Embedding` → `VectorStore Retrieval`
+  - 支援嵌入模型：OpenAI Embedding / HuggingFace SentenceTransformers
+- **向量資料庫**：FAISS（支援快速語意檢索）
+- **語言模型（LLM）**：Ollama（本地 LLM），可替換為 GPT-4, Claude 等 API 模型
+- 回應流程：
+  - 使用者問題 → 找相關文檔段落 → 補足 Prompt → 回傳回答
+
+### 4. 知識庫後台管理
+
+- 支援文件類型：
+  - `.pdf`, `.txt`, `.docx`, `.md`
+- 上傳即觸發處理流程，儲存向量至 FAISS
+- 可擴展功能：
+  - 文件分群 / 標籤管理
+  - 文件版本控制
+  - 權限驗證（多使用者）
 
 ---
+
+## 三、未來擴充功能（Phase 2+）
+
+### ✅ 多渠道支援
+
+- LINE Bot / Messenger Bot 串接（實現跨平台 AI 助理）
+- 可將聊天功能嵌入任何網站 / 行動應用程式
+
+### ✅ 互動性提升
+
+- 聲音支援：
+  - TTS（Text-to-Speech）語音回應
+  - STT（Speech-to-Text）語音輸入
+- 即時聊天記錄分析 / Log 回溯功能
+
+### ✅ Plugin 式 Function Calling
+
+- 類似 OpenAI Function Calling 架構
+- 允許 Agent 根據指令選擇執行某 API 或 Plugin 功能
+- 範例：
+  - 查天氣 → 調用天氣 API
+  - 計算總和 → 調用計算函數
+
+### ✅ 多角色 / 多人語境理解
+
+- 多使用者情境支援（含會話記憶、上下文辨識）
+- 支援「助理角色分工」：如客服助理、技術助理、行政助理
+
+---
+
+## 範例應用情境
+
+- 🔎 **企業內部 FAQ 智能查詢系統**
+- 📚 **PDF 文件閱讀助理 / 法律合約導讀**
+- 🤖 **教育平台助教 / 知識導航**
+- 💬 **AI 客服系統（自託管 + 私有模型支援）**
+
+---
+
+Allagent 專案仍在持續開發中，歡迎前往 GitHub 了解更多，或留言交流應用與部署需求。

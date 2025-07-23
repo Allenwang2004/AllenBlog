@@ -1,39 +1,112 @@
 ---
 title: Livetrade
-description: Live-trading sysytem of CTA strategies on crypto currency
+description: Live-trading system of CTA strategies on cryptocurrency
 slug: livetrade-post
 date: 2025-04-26
 type: Post
 ---
 
-### 一、主要目標
+# Livetrade：加密貨幣 CTA 策略的即時交易系統
 
-全自動的交易系統
-
----
-
-### 二、基本模組 (Phase 1)
-
-1. **Datawarehouse**
-   - websocket live stream 收集資料
-   - 根據資料產出 Alpha
-
-2. **Strategy**
-   - 根據 Alpha 做出交易決策
-   - 使用 Line bot 通知
-
-3. **Order＆ Risk Manager**
-   - 管理訂單
-   - 控制倉位
-
-4. **Portfolio Manager**
-   - 追蹤績效並使用 Grafana 呈現
+Livetrade 是一套模組化的全自動交易系統，專為加密貨幣市場設計，從資料蒐集、策略執行、下單風控到績效追蹤，皆實現端到端自動化。支援多策略、跨交易所部署，亦可整合通知與視覺化模組，適用於研究與實盤交易。
 
 ---
 
-### 三、未來擴充 (推薦 Phase 2+)
+## 一、主要目標
 
-- 持續擴展交易策略
-- 連接 Backtrade 自動下架回測表現不佳的策略
+- 建立**全自動交易系統**，涵蓋資料收集、策略判斷、下單與風控、績效回報等流程。
+- 支援**高頻即時資料處理**，適用於秒級至分鐘級交易。
+- 策略事件可即時整合至**Line Bot / Telegram Bot**通知系統。
+- 架構**模組化、可擴展**，便於日後維護與新增策略。
 
 ---
+
+## 二、基本模組（Phase 1）
+
+### 1. Data Warehouse（資料倉儲）
+
+- 使用 WebSocket 串流收集來自 Binance / WooX 等交易所的即時資料，包括：
+  - Kline (OHLC)
+  - Ticker
+  - Orderbook
+- 支援多時間頻率資料聚合（e.g. 1s / 1m / 1h）
+- 整合 ETL 管線，實現資料清洗與標準化
+- 計算並提供多種 Alpha 特徵，如：
+  - 動能指標（Momentum）
+  - 波動率（Volatility）
+  - 成交量變化
+  - 持倉量變化
+
+### 2. Strategy（策略引擎）
+
+- 根據 Alpha 因子產生交易訊號
+- 策略範例：
+  - MA 趨勢策略
+  - RSI 超買超賣策略
+  - 反轉策略
+- 支援多策略同時執行，含策略資金分配
+- 所有交易決策透過 Line Bot / Telegram 通知，便於監控與紀錄
+
+### 3. Order ＆ Risk Manager（下單與風控模組）
+
+- 封裝交易所 API，支援下單類型：
+  - 限價單、市價單
+  - 止盈止損單
+  - OCO 訂單（One Cancels the Other）
+- 控制下單頻率，防止頻繁請求與資金風險
+- 風控功能包含：
+  - 單筆最大損失控制
+  - 單策略最大資金使用限制
+  - 自動取消掛單
+  - 閃崩價格過濾器（異常價保護）
+
+### 4. Portfolio Manager（績效與組合管理）
+
+- 每筆交易記錄包含：
+  - 進出場價格與時間
+  - 所屬策略與報酬率
+- 計算各策略與總體績效指標：
+  - 淨值變化
+  - Sharpe Ratio
+  - 最大回撤（Max Drawdown）
+- 串接 **Grafana + Prometheus** 實現即時績效視覺化
+- 每日／每週自動生成績效報告（Markdown / PDF / Line）
+
+---
+
+## 三、未來擴充功能（Phase 2+）
+
+### ✅ 策略中心與自動管理
+
+- 支援動態策略掛載／下架
+- 連接 `Backtrader` 自動回測系統
+- 定期檢查策略表現，若績效不佳自動下架或降低資金配置
+
+### ✅ 多交易所支援與套利策略
+
+- 擴展至 Bybit、OKX、Deribit 等主流交易所
+- 跨所搬磚、資金費率套利策略建構
+- 多帳戶、API 金鑰管理模組設計
+
+### ✅ 資料與監控強化
+
+- 使用 Kafka + TimescaleDB 儲存高頻流資料
+- 建立異常事件標記與交易回溯系統
+- 提供交易行為可解釋性（Explainability）
+
+### ✅ 風控進階模組
+
+- 統一 Portfolio Risk Control：
+  - Value-at-Risk（VaR）
+  - 預測損失模型（Expected Shortfall）
+- 實作策略冷卻時間與最大交易次數限制
+
+### ✅ Dashboard UI 介面
+
+- 建置前端頁面（React / Next.js）查看即時交易與策略狀態
+- 可視化各策略交易點位與資金配置
+- 提供策略參數調整與報表查詢功能
+
+---
+
+如需技術架構圖、Docker 部署腳本或策略範本，可另行提供。

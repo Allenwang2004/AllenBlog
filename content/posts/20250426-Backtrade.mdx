@@ -1,44 +1,85 @@
 ---
 title: Backtrade
-description: Backtesting sysytem of CTA strategies on crypto currency
+description: Backtesting system of CTA strategies on cryptocurrency
 slug: backtrade-post
 date: 2025-04-01
 type: Post
 ---
 
-**量化策略回測框架 [Github](<https://github.com/Allenwang2004/Backtrade>)**
+# Backtrade：加密貨幣 CTA 策略回測框架
+
+**量化策略回測框架 [GitHub Repository](https://github.com/Allenwang2004/Backtrade)**  
+Backtrade 是一套專為加密貨幣市場設計的模組化回測框架，支援從 1 分 K 到 4 小時 K 的 CTA 策略回測，並具備多策略、多下單類型、參數優化與績效可視化能力，為策略開發者提供即時且精準的歷史模擬平台。
 
 ---
 
-### 一、主要目標
+## 一、主要目標
 
-基於時長從 1分k 到 4小時k 的交易策略進行回測
-
----
-
-### 二、基本模組 (Phase 1)
-
-1. **Strtegy**
-   - 進出場點邏輯
-   - 下單種類(市價單、限價單、附加訂單...)
-   - 支援多策略
-   - 使用optuna做參數優化
-
-2. **Broker**
-   - 模擬搓合(根據成交量)
-
-3. **Quantstate**
-   - 績效指標
-   - 每月報酬
-
-4. **進場點位**
-   - 使用bokeh繪製進出場點位
+- 建立可模擬**高頻至中頻策略**的回測系統（支援 1min ～ 4h）
+- 精準模擬真實交易環境，涵蓋成交邏輯與多下單方式
+- 提供多策略並行測試與自動化參數優化
+- 完整的績效追蹤與視覺化分析工具
 
 ---
 
-### 三、未來擴充 (推薦 Phase 2+)
+## 二、基本模組（Phase 1）
 
-- Datafeed 直接對接交易所 API
-- 使用tick等級的資料做模擬搓合
+### 1. Strategy（策略模組）
+
+- 撰寫與測試進出場邏輯
+- 支援多種下單類型：
+  - 市價單（Market Order）
+  - 限價單（Limit Order）
+  - 附加訂單（如 Stop Loss / Take Profit）
+- 支援多策略同時執行（Multi-strategy backtest）
+- 整合 [`Optuna`](https://optuna.org/) 進行策略參數的自動化優化（Bayesian Optimization）
+
+### 2. Broker（模擬撮合器）
+
+- 根據歷史資料模擬真實撮合行為
+- 撮合條件考量：
+  - 成交價格與數量
+  - 是否觸及限價條件
+- 可擴展以支援更高解析度的撮合（如 tick 撮合）
+
+### 3. QuantState（績效分析模組）
+
+- 計算各項績效指標，包括：
+  - 年化報酬、年化波動、Sharpe Ratio、Max Drawdown 等
+- 自動產出月度回報統計報表
+- 支援策略間績效比較與分析
+
+### 4. 進出場點位視覺化
+
+- 使用 `Bokeh` 圖形工具繪製：
+  - 每筆交易進出場點
+  - 持倉區間標註
+- 提供互動式圖表，便於策略檢視與調整
 
 ---
+
+## 三、未來擴充功能（Phase 2+）
+
+### ✅ 資料來源模組強化
+
+- 支援直接串接交易所 API 作為資料來源（Binance / Bybit / WooX）
+- 擴充支援 tick 級別資料（例如 Orderbook replay）
+
+### ✅ 撮合模擬提升
+
+- 導入 tick 級成交模擬，進一步提升回測真實性
+- 引入滑價與延遲模型，模擬高頻策略的實際表現
+
+### ✅ 多資產與組合策略測試
+
+- 跨幣種回測（如 BTC、ETH、SOL 同步測試）
+- 結合 Portfolio 管理模組，測試多策略下資金分配效果
+
+### ✅ 自動化研究與報告產生
+
+- 結合回測與研究模組，自動生成策略績效報告
+- 輸出 Markdown / PDF 報告，供內部審閱或分享
+
+---
+
+Backtrade 仍在持續開發與優化中，未來將提供更完整的工具鏈，支援量化研究者快速構建、驗證與部署交易策略。如有興趣貢獻或合作，歡迎聯絡或於 GitHub 上開 issue。
