@@ -92,12 +92,12 @@ const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
           <PostList posts={posts} />
         </div>
       <div className="prose prose-lg my-16 mx-auto text-center dark:prose-dark max-w-3xl">
-            <a
-              href="/resume"
-              className="inline-block mt-4 px-6 py-3 font-medium rounded border border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-500 dark:text-gray-200 dark:hover:bg-gray-800 transition"
-            >
-              Experience
-            </a>
+        <a
+          href="/resume"
+          className="inline-block mt-4 px-6 py-3 font-medium rounded text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800 transition"
+        >
+          Experience
+        </a>
       </div>
       </div>
       {/*<EmailSubscribeForm />*/}
