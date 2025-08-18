@@ -28,6 +28,7 @@ type PostForPostPage = PostForPostLayout & {
   date: string;
   path: string;
   socialImage: string | null;
+  image?: string; // 新增封面圖片欄位
   body: {
     code: string;
   };
@@ -96,6 +97,7 @@ export const getStaticProps: GetStaticProps<Props, Params> = async (
     description: postFull.description,
     path: postFull.path,
     socialImage: postFull.socialImage || null,
+    image: postFull.image || null, // 取出 image
     body: {
       code: postFull.body.code,
       raw: postFull.body.raw,
@@ -130,6 +132,7 @@ const PostPage: NextPage<Props> = ({
     date,
     path,
     socialImage,
+    image, // 取出 image
     body: { code },
   } = post;
   useCommandPalettePostActions(commandPalettePosts);
@@ -171,6 +174,17 @@ const PostPage: NextPage<Props> = ({
         authorName={siteConfigs.author}
         description={description}
       />
+
+      {/* 新增：若有 image 則顯示封面圖片 */}
+      {image && (
+        <div className="mb-6">
+          <img
+            src={image}
+            alt={title}
+            className="w-full max-h-96 object-cover rounded-lg shadow"
+          />
+        </div>
+      )}
 
       <PostLayout post={post} prevPost={prevPost} nextPost={nextPost}>
         <MDXContent components={mdxComponents} />

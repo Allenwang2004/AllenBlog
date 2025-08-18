@@ -9,6 +9,7 @@ export interface PostForPostList {
   title: string;
   description: string;
   path: string;
+  image: string;
 }
 
 type Props = {
@@ -18,36 +19,32 @@ type Props = {
 export default function PostList({ posts = [] }: Props) {
   const { locale } = useRouter();
 
+  if (!posts.length) return <p className="text-center text-gray-500 dark:text-gray-400">No posts found.</p>;
+
   return (
-    <ul className="divide-y divide-gray-200 transition-colors dark:divide-gray-700">
-      {!posts.length && 'No posts found.'}
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {posts.map((post) => {
-        const { slug, date, title, description, path } = post;
+        const { slug, date, title, description, path, image } = post;
+
         return (
-          <li key={slug} className="group transition-colors">
-            <CustomLink href={path}>
-              <article className="space-y-2 rounded-xl p-4 transition-colors group-hover:bg-gray-100 dark:group-hover:bg-gray-800 xl:grid xl:grid-cols-4  xl:items-baseline xl:space-y-0">
-                <dl>
-                  <dt className="sr-only">Published on</dt>
-                  <dd className="text-sm font-medium leading-6 text-gray-500 transition-colors dark:text-gray-400 md:text-base">
-                    <time dateTime={date}>{formatDate(date, locale)}</time>
-                  </dd>
-                </dl>
-                <div className="space-y-3 xl:col-span-3">
-                  <div>
-                    <h3 className="text-lg font-bold tracking-tight text-gray-900 transition-colors dark:text-gray-100 sm:text-xl md:text-2xl">
-                      {title}
-                    </h3>
-                  </div>
-                  <div className="prose prose-sm max-w-none text-gray-500 transition-colors dark:text-gray-400 md:prose-base">
-                    {description}
-                  </div>
-                </div>
-              </article>
-            </CustomLink>
-          </li>
+          <CustomLink key={slug} href={path} className="group block rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow overflow-hidden">
+            <div className="aspect-video overflow-hidden">
+              <img
+                src={image}
+                alt={title}
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              />
+            </div>
+            <div className="p-4 space-y-2">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-500 transition-colors">
+                {title}
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{formatDate(date, locale)}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">{description}</p>
+            </div>
+          </CustomLink>
         );
       })}
-    </ul>
+    </div>
   );
 }
