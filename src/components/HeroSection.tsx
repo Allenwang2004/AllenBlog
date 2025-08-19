@@ -1,6 +1,7 @@
-'use client';
+"use client"
 
-import { TypeAnimation } from 'react-type-animation';
+import { TypeAnimation } from "react-type-animation"
+import ScrollIndicator from "./Scroll-indicator"
 
 export default function HeroSection() {
   return (
@@ -8,30 +9,24 @@ export default function HeroSection() {
       <div className="flex flex-col-reverse md:flex-row items-center justify-between w-full flex-1 max-w-6xl">
         {/* 左邊文字區塊 */}
         <div className="flex-1 text-center md:text-left space-y-6">
-          <p className="text-2xl font-medium text-gray-600 dark:text-gray-400">
-            HI, I AM
-          </p>
+          <p className="text-2xl font-medium text-gray-600 dark:text-gray-400">HI, I AM</p>
           <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold leading-tight">
-            <span className="text-blue-600 dark:text-blue-400">ALLEN</span>{' '}
+            <span className="text-blue-600 dark:text-blue-400">ALLEN</span>{" "}
             <span className="text-gray-900 dark:text-white">WANG</span>
           </h1>
 
           <h2 className="text-2xl md:text-3xl text-gray-700 dark:text-gray-300 font-semibold">
             <TypeAnimation
-              sequence={[
-                'Developer', 2000,
-                'Quant', 2000,
-                'Open Source Builder', 2000,
-              ]}
+              sequence={["Developer", 2000, "Quant", 2000, "Open Source Builder", 2000]}
               speed={50}
-              repeat={Infinity}
+              repeat={Number.POSITIVE_INFINITY}
             />
           </h2>
 
-          {/* <p className="text-lg text-gray-600 dark:text-gray-400 max-w-xl">
-            I build high-performance trading systems, data pipelines, and web applications.
-            Passionate about code, markets, and emerging tech.
-          </p> */}
+          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-xl">
+            I build high-performance trading systems, data pipelines, and web applications. Passionate about code,
+            markets, and emerging tech.
+          </p>
 
           {/* <div className="pt-4">
             <a
@@ -55,6 +50,8 @@ export default function HeroSection() {
           </div>
         </div>
       </div>
+
+      <ScrollIndicator />
     </section>
-  );
+  )
 }
