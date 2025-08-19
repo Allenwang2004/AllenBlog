@@ -1,0 +1,8 @@
+ignoredBuiltDependencies:
+  - '@parcel/watcher'
+  - contentlayer
+  - core-js
+  - esbuild
+  - protobufjs
+  - rehype-code-titles
+  - sharp
