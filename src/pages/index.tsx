@@ -68,7 +68,7 @@ const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
   return (
     <LayoutPerPage>
       {/* {mounted && theme === 'dark' && <GalaxyBackground />} */}
-      <HeroSection />
+      {/* <HeroSection /> */}
       <div style={{ position: 'relative', zIndex: 10 }}>
         {/* Personal Avatar and Introduction */}
         {/* <div className="flex flex-col items-center justify-center my-8">
