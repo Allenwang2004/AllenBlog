@@ -1,4 +1,4 @@
 export const headerConfigs = {
-  title: 'Allen Wang',
+  title: 'Dev',
   navLinks: [{ href: '/', title: 'home' }],
 };
