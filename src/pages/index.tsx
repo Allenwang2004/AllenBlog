@@ -23,6 +23,8 @@ import generateRSS from '@/lib/generateRSS';
 //   ssr: false,
 // });
 
+import HeroSection from '@/components/HeroSection';
+
 type PostForIndexPage = PostForPostList;
 
 type Props = {
@@ -66,10 +68,10 @@ const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
   return (
     <LayoutPerPage>
       {/* {mounted && theme === 'dark' && <GalaxyBackground />} */}
-
+      <HeroSection />
       <div style={{ position: 'relative', zIndex: 10 }}>
         {/* Personal Avatar and Introduction */}
-        <div className="flex flex-col items-center justify-center my-8">
+        {/* <div className="flex flex-col items-center justify-center my-8">
           <img
             src="/photo.jpg"
             alt="Allen's Avatar"
@@ -79,7 +81,7 @@ const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
           <p className="text-gray-600 dark:text-gray-300 text-center max-w-xl">
             Hi, I'm Allen! I'm a passionate developer, focusing on Web3, AI, and trading systems. Welcome to my blog where I share my projects, insights, and tutorials on technology, and more.
           </p>
-        </div>
+        </div> */}
         {/* End Personal Avatar and Introduction */}
 
         <ArticleJsonLd
