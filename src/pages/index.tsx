@@ -19,11 +19,22 @@ import { siteConfigs } from '@/configs/siteConfigs';
 import { allPostsNewToOld } from '@/lib/contentLayerAdapter';
 import generateRSS from '@/lib/generateRSS';
 
-// const GalaxyBackground = dynamic(() => import('@/components/GalaxyBackground'), {
-//   ssr: false,
-// });
+const GalaxyBackground = dynamic(() => import('@/components/GalaxyBackground'), {
+  ssr: false,
+});
 
-import HeroSection from '@/components/HeroSection';
+const HeroSection = dynamic(() => import('@/components/HeroSection'), {
+  ssr: false,
+});
+
+const RippleBackground = dynamic(() => import('@/components/Water'), {
+  ssr: false,
+});
+
+const RippleBackground2 = dynamic(() => import('@/components/Water2'), {
+  ssr: false,
+});
+
 
 type PostForIndexPage = PostForPostList;
 
@@ -66,9 +77,11 @@ const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
   useCommandPalettePostActions(commandPalettePosts);
 
   return (
-    <LayoutPerPage>
-      {/* {mounted && theme === 'dark' && <GalaxyBackground />} */}
+    <LayoutPerPage>      
+      {mounted && theme === 'dark' && <RippleBackground />}
+      {mounted && theme !== 'dark' && <RippleBackground2 />}
       <HeroSection />
+      {/* Main Content */}
       <div style={{ position: 'relative', zIndex: 10 }}>
         {/* Personal Avatar and Introduction */}
         {/* <div className="flex flex-col items-center justify-center my-8">
@@ -118,7 +131,6 @@ const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
       </div>
       </div>
       {/*<EmailSubscribeForm />*/}
-      
     </LayoutPerPage>
   );
 };

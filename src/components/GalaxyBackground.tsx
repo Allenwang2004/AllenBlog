@@ -39,12 +39,12 @@ const GalaxyBackground = () => {
     }));
 
     const friction = 0.85;
-    const ufo = {
-      x: width / 2,
-      y: height / 2,
-      dx: (Math.random() - 0.5) * 2,
-      dy: (Math.random() - 0.5) * 2,
-    };
+    // const ufo = {
+    //   x: width / 2,
+    //   y: height / 2,
+    //   dx: (Math.random() - 0.5) * 2,
+    //   dy: (Math.random() - 0.5) * 2,
+    // };
 
     const animate = () => {
       ctx.clearRect(0, 0, width, height);
@@ -63,14 +63,14 @@ const GalaxyBackground = () => {
       for (let star of stars) {
         const distX = mouse.current.x - star.x;
         const distY = mouse.current.y - star.y;
-        const distance = Math.sqrt(distX * distX + distY * distY);
+        // const distance = Math.sqrt(distX * distX + distY * distY);
 
-        if (distance < 200) {
-          const force = (200 - distance) / 200;
-          const angle = Math.atan2(distY, distX);
-          star.dx += Math.cos(angle) * force * 0.08;
-          star.dy += Math.sin(angle) * force * 0.08;
-        }
+        // if (distance < 200) {
+        //   const force = (200 - distance) / 200;
+        //   const angle = Math.atan2(distY, distX);
+        //   star.dx += Math.cos(angle) * force * 0.08;
+        //   star.dy += Math.sin(angle) * force * 0.08;
+        // }
 
         star.dx *= friction;
         star.dy *= friction;
@@ -92,50 +92,50 @@ const GalaxyBackground = () => {
       // ========================
       // ✅ 飛碟也受滑鼠吸引
       // ========================
-      const distX = mouse.current.x - ufo.x;
-      const distY = mouse.current.y - ufo.y;
-      const distance = Math.sqrt(distX * distX + distY * distY);
+      // const distX = mouse.current.x - ufo.x;
+      // const distY = mouse.current.y - ufo.y;
+      // const distance = Math.sqrt(distX * distX + distY * distY);
 
-      if (distance < 500) { // ⭐ 吸引距離可以設比較遠一點
-        const force = (300 - distance) / 300;
-        const angle = Math.atan2(distY, distX);
-        ufo.dx += Math.cos(angle) * force * 0.05; // 力量小一點
-        ufo.dy += Math.sin(angle) * force * 0.05;
-      }
+      // if (distance < 500) { // ⭐ 吸引距離可以設比較遠一點
+      //   const force = (300 - distance) / 300;
+      //   const angle = Math.atan2(distY, distX);
+      //   ufo.dx += Math.cos(angle) * force * 0.05; // 力量小一點
+      //   ufo.dy += Math.sin(angle) * force * 0.05;
+      // }
 
-      // 更新飛碟位置
-      ufo.x += ufo.dx;
-      ufo.y += ufo.dy;
-      ufo.dx += (Math.random() - 0.5) * 0.05;
-      ufo.dy += (Math.random() - 0.5) * 0.05;
+      // // 更新飛碟位置
+      // ufo.x += ufo.dx;
+      // ufo.y += ufo.dy;
+      // ufo.dx += (Math.random() - 0.5) * 0.05;
+      // ufo.dy += (Math.random() - 0.5) * 0.05;
 
-      // 飛碟撞星星，星星被撞開
-      for (let star of stars) {
-        const distX = ufo.x - star.x;
-        const distY = ufo.y - star.y;
-        const distance = Math.sqrt(distX * distX + distY * distY);
+      // // 飛碟撞星星，星星被撞開
+      // for (let star of stars) {
+      //   const distX = ufo.x - star.x;
+      //   const distY = ufo.y - star.y;
+      //   const distance = Math.sqrt(distX * distX + distY * distY);
 
-        if (distance < 30) {
-          const force = (30 - distance) / 30;
-          const angle = Math.atan2(distY, distX);
-          ufo.dx += Math.cos(angle) * force * 3;
-          ufo.dy += Math.sin(angle) * force * 3;
-          star.dx -= Math.cos(angle) * force * 10.0;
-          star.dy -= Math.sin(angle) * force * 10.0;
-        }
-      }
+      //   if (distance < 30) {
+      //     const force = (30 - distance) / 30;
+      //     const angle = Math.atan2(distY, distX);
+      //     ufo.dx += Math.cos(angle) * force * 3;
+      //     ufo.dy += Math.sin(angle) * force * 3;
+      //     star.dx -= Math.cos(angle) * force * 10.0;
+      //     star.dy -= Math.sin(angle) * force * 10.0;
+      //   }
+      // }
 
-      const maxSpeed = 3;
-      ufo.dx = Math.max(-maxSpeed, Math.min(maxSpeed, ufo.dx));
-      ufo.dy = Math.max(-maxSpeed, Math.min(maxSpeed, ufo.dy));
+      // const maxSpeed = 3;
+      // ufo.dx = Math.max(-maxSpeed, Math.min(maxSpeed, ufo.dx));
+      // ufo.dy = Math.max(-maxSpeed, Math.min(maxSpeed, ufo.dy));
 
-      if (ufo.x < 0 || ufo.x > width) ufo.dx *= -1;
-      if (ufo.y < 0 || ufo.y > height) ufo.dy *= -1;
+      // if (ufo.x < 0 || ufo.x > width) ufo.dx *= -1;
+      // if (ufo.y < 0 || ufo.y > height) ufo.dy *= -1;
 
-      ctx.beginPath();
-      ctx.ellipse(ufo.x, ufo.y, 8, 8, 0, 0, Math.PI * 2);
-      ctx.fillStyle = 'white';
-      ctx.fill();
+      // ctx.beginPath();
+      // ctx.ellipse(ufo.x, ufo.y, 8, 8, 0, 0, Math.PI * 2);
+      // ctx.fillStyle = 'white';
+      // ctx.fill();
 
       requestAnimationFrame(animate);
     };
