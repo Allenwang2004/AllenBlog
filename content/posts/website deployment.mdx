@@ -1,0 +1,262 @@
+---
+title: Website Deployment
+description: 如何部署網頁程式碼到雲端
+slug: website deployment-post
+date: 2025-08-24
+type: Post
+image: /images/_.jpeg
+---
+
+
+這篇文章主要在說明，如何把撰寫好的個人網站程式碼，部署到雲端，並且可以被收尋引擎給收尋
+
+### 雲端部署
+
+推薦使用 vercel 當作server
+
+### 網域註冊
+
+使用 vercel 註冊其實就會提供域名，但我希望使用我喜歡的域名，所以到 Namecheap 上去購買．
+
+所謂域名其實就只是一個字串，它被 DNS 解析後成為 IP 才有意義，所以在 Namecheap 的 Advancesd DNS 上，要讓域名指到 Vercel 的伺候器 IP
+
+![截圖 2025-07-04 下午6.51.37.png](/images/website deployment/1.png)
+
+但如果只有這樣，明顯不夠．因為這麼多個專案在 Vercel 上運行，這個 IP 對應了這麽多網域，怎麼知道是哪個．
+
+Vercel 是透過**反向代理**的方式，讓同一個 IP 可以服務這麼多網域，所以我們還需要在 Vercel 這邊綁定域名．
+
+![截圖 2025-07-04 下午6.51.47.png](/images/website deployment/2.png)
+
+簡單來說 它的路徑是這樣
+
+```python
+使用者輸入 example.com
+        ↓
+瀏覽器詢問 DNS → 找到 A Record / CNAME
+        ↓
+DNS 回覆：IP = 76.76.21.21 (Vercel)
+        ↓
+瀏覽器發送 HTTP 請求到 Vercel IP
+        ↓
+Vercel 依照綁定的域名 → 對應到你的專案
+        ↓
+Vercel 回傳你的網站內容 (HTML/CSS/JS)
+```
+
+那到這邊，你就可以打開瀏覽器，輸入域名，看到你的網站了．
+
+但如果去 Google 上收尋，會發現不管怎麼找都找不到，
+
+這是因為搜尋引擎還沒有發現和索引你的網站。
+
+## **搜尋引擎優化 (SEO) 教學**
+
+要讓你的 **Vercel 部署的 Next.js 網站**被 Google 等搜尋引擎找到，需要完成以下步驟：
+
+### **建立並提交 Sitemap**
+
+**Sitemap (網站地圖)** 是告訴搜尋引擎「我的網站有哪些頁面」的清單。
+
+### **自動生成 Sitemap（建議）**
+
+使用 [next-sitemap](/images/website deployment//www.npmjs.com/package/next-sitemap) 套件：
+
+```
+npm install next-sitemap
+```
+
+在專案根目錄新增 next-sitemap.config.js：
+
+```
+module.exports = {
+  siteUrl: 'https://yourdomain.com',
+  generateRobotsTxt: true,
+};
+```
+
+修改 package.json，讓建置完成後自動生成 sitemap：
+
+```
+{
+  "scripts": {
+    "build": "next build",
+    "postbuild": "next-sitemap"
+  }
+}
+```
+
+### **設定 robots.txt**
+
+在根目錄的 public/robots.txt ：
+
+```
+User-agent: *
+Allow: /
+Sitemap: https://yourdomain.com/sitemap.xml
+```
+
+表示搜尋引擎可以抓取所有頁面，並且知道 Sitemap 的位置。
+
+### **在 Google Search Console 驗證網域**
+
+1. 前往 [Google Search Console](/images/website deployment//search.google.com/search-console/)。
+2. 新增網站 → 輸入 yourdomain.com。
+3. 選擇 **透過 DNS TXT 記錄驗證**。
+    - 在域名供應商（例如 Namecheap）的 DNS 設定中新增 TXT record：
+
+```
+Host: @
+Value: google-site-verification=xxxxxx
+TTL: Automatic
+```
+
+### **提交 Sitemap 給 Google**
+
+在 Search Console → **Sitemap** 頁面：
+
+輸入：yourdomain.com.xml
+
+```
+sitemap.xml
+```
+
+## **next-seo**
+
+如果只有這樣的話，平常我們收尋關鍵字要怎麼找到對應網站，從上面看起來沒有任何步驟做到啊
+
+一般來說，我們可以每一個頁面加上 head，像底下這樣
+
+```python
+import Head from "next/head"
+
+<Head>
+  <title>Allen Wang | Developer</title>
+  <meta name="description" content="I build trading systems..." />
+  <meta property="og:title" content="Allen Wang" />
+  <meta property="og:image" content="/photo.jpg" />
+</Head>
+```
+
+但這樣我要每一個頁面都做，太麻煩了，用 [next-seo](/images/website deployment//github.com/garmeeh/next-seo) 可以自動化設定。
+
+### **全站預設 SEO**
+
+在 _app.js 或 _app.tsx 中設定：
+
+```
+import { DefaultSeo } from 'next-seo';
+
+export default function MyApp({ Component, pageProps }) {
+  return (
+    <>
+      <DefaultSeo
+        title="你的網站標題"
+        description="你的網站描述，150字內"
+        canonical="https://yourdomain.com"
+        openGraph={{
+          type: 'website',
+          locale: 'zh_TW',
+          url: 'https://yourdomain.com',
+          siteName: '你的網站名稱',
+        }}
+        twitter={{
+          handle: '@你的推特',
+          site: '@你的推特',
+          cardType: 'summary_large_image',
+        }}
+      />
+      <Component {...pageProps} />
+    </>
+  );
+}
+```
+
+- 定義的 meta / openGraph / twitter 等，會套用在所有頁面。
+- 如果某頁沒有額外定義，會直接沿用這些預設。
+
+### **單一頁面 SEO**
+
+在需要的頁面加上：
+
+```
+import { NextSeo } from 'next-seo';
+
+export default function HomePage() {
+  return (
+    <>
+      <NextSeo
+        title="首頁標題"
+        description="首頁描述"
+        canonical="https://yourdomain.com/"
+        openGraph={{
+          url: 'https://yourdomain.com/',
+          title: '首頁標題',
+          description: '首頁描述',
+          images: [
+            { url: 'https://yourdomain.com/home-og.jpg', width: 1200, height: 630 },
+          ],
+        }}
+      />
+      <main>你的頁面內容</main>
+    </>
+  );
+}
+```
+
+### **文章頁面（動態內容）**
+
+使用 ArticleJsonLd 產生結構化資料：
+
+```
+import { ArticleJsonLd, NextSeo } from 'next-seo';
+
+export default function BlogPost({ post }) {
+  return (
+    <>
+      <NextSeo
+        title={post.title}
+        description={post.excerpt}
+        canonical={`https://yourdomain.com/blog/${post.slug}`}
+        openGraph={{
+          type: 'article',
+          title: post.title,
+          description: post.excerpt,
+          article: {
+            publishedTime: post.publishedAt,
+            modifiedTime: post.updatedAt,
+            authors: ['https://yourdomain.com/about'],
+            tags: post.tags,
+          },
+          images: [{ url: post.ogImage, width: 1200, height: 630 }],
+        }}
+      />
+      <ArticleJsonLd
+        url={`https://yourdomain.com/blog/${post.slug}`}
+        title={post.title}
+        images={[post.ogImage]}
+        datePublished={post.publishedAt}
+        dateModified={post.updatedAt}
+        authorName="你的名字"
+        description={post.excerpt}
+      />
+      <article>{/* 文章內容 */}</article>
+    </>
+  );
+}
+```
+
+- 可以 **覆蓋** DefaultSeo 的設定。
+- 適合設定：文章標題、文章描述、文章縮圖、動態生成的內容。
+
+那等待抓取需要一點時間，如果想測試的話可以在 google 收尋
+
+```python
+site:yourdomain.com
+```
+
+成功的話會像這樣
+
+![Screenshot 2025-08-24 at 1.30.41 AM.png](/images/website deployment/Screenshot_2025-08-24_at_1.30.41_AM.png)
+
+這篇的內容大概就這樣囉．

@@ -68,7 +68,11 @@ const TableOfContents = ({ source }: Props) => {
     .filter((line) => line.match(/^###?\s/));
 
   const headings = headingLines.map((raw) => {
-    const text = raw.replace(/^###*\s/, '');
+    let text = raw.replace(/^###*\s/, '');
+    // Remove markdown bold (**...**) and __...__
+    text = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/__(.*?)__/g, '$1');
+    // Remove inline HTML <strong>...</strong>
+    text = text.replace(/<strong>(.*?)<\/strong>/gi, '$1');
     const level = raw.slice(0, 3) === '###' ? 3 : 2;
     const slugger = new GithubSlugger();
 
