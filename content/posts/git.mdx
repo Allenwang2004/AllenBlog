@@ -1,0 +1,210 @@
+---
+title: Git
+description: 如何使用git進行協作
+slug: git-post
+date: 2025-08-24
+type: Post
+image: /images/cover.png
+---
+
+這篇文章紀錄我目前使用 git 常用的指令，未來可能會持續更新
+
+開始前先附上一張梗圖
+
+![download.jpeg](/images/git/download.jpeg)
+
+其實蠻有道理的…
+
+## 初始設定
+
+```bash
+# 設定全域使用者資訊
+git config --global [user.name](/images/git//user.name) "你的名稱"
+git config --global [user.email](/images/git//user.email) "你的電子郵件"
+```
+
+### GitHub CLI 認證
+
+```bash
+gh auth login
+```
+
+---
+
+## 基本操作
+
+### 建立新倉庫
+
+```bash
+git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin <GitHub-Repository-URL>
+git push -u origin main
+```
+
+### 日常更新流程
+
+如果是小型專案，但依然推薦可以練習更底下的分支管理
+
+```bash
+# 推送更新
+git add .  # 或指定檔案：git add filename.txt
+git commit -m "Update files"
+git push origin main
+
+# 拉取更新
+git pull origin main
+
+# 查看狀態
+git status
+
+# 查看歷史
+git log
+```
+
+這邊有個小建議是不管怎麼樣都先
+
+```bash
+git diff
+```
+
+看一下你到底做了什麼事，那他其實就是比較你的 local 跟你電腦 disk 存放的差異
+
+---
+
+## 分支管理
+
+### 基本分支操作
+
+```bash
+# 建立新分支
+git branch <branch_name>
+
+# 切換分支
+git checkout <branch_name>
+
+# 查看所有分支
+git branch
+
+# 切換到 master 分支
+git branch -m master
+```
+
+### 分支合併
+
+這裡，我的習慣是都在分支上做開發，然後修改完後，如果是多人協作的情況，本地的 main 很有可能已經落後遠端的 main 這時候就要做
+
+```bash
+git checkout main
+
+git pull origin main
+
+git checkout <branch_name>
+
+git rebase main //如果有衝突，這時要解決再繼續 git rebase --continue。
+
+git push -f origin <branch_name>
+
+接著再發 pull request
+
+git checkout main
+
+git pull origin main
+```
+就算你是自行開發也建議這麼做，這樣可以確保主分支永遠都是乾淨的
+
+---
+
+### 強制同步
+
+如果你不小心毀了一些東西，還丟到了遠端上，可以像底下這樣
+
+```bash
+
+# 回到特定 commit 狀態
+git reset --hard <commit>
+git push origin main --force
+```
+
+---
+
+## 檔案管理
+
+### .gitignore 設定
+
+```bash
+# 讓 .gitignore 生效（移除已追蹤的檔案）
+git rm -r --cached .
+
+# 停止追蹤特定檔案
+git rm --cached -r __pycache__/
+```
+
+### .gitignore 常見用法
+
+建立 `.gitignore` 檔案來忽略不需要版本控制的檔案，底下說明一些我平常會用的 :
+
+### **系統檔案**
+
+```
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+```
+
+### **編輯器和 IDE**
+
+```
+# Visual Studio Code
+.vscode/
+*.code-workspace
+```
+
+### **敏感資訊**
+
+```
+# 環境變數和設定檔
+.env
+.env.local
+
+# 資料庫
+*.db
+*.sqlite
+
+# 密鑰檔案
+*.key
+*.pem
+config.json
+secrets.json
+```
+
+---
+
+## 特殊情況處理
+
+### 連接現有遠端倉庫
+
+```bash
+git init
+git remote add origin <github-repo-url>
+git pull origin main --allow-unrelated-histories
+# 之後按正常流程操作
+```
+
+### 強制合併不相關歷史
+
+```bash
+git pull origin main --allow-unrelated-histories
+```
+
+---
+
+### 進階功能
+
+### Git Submodules
+
+`.gitmodule` 文件用於管理子模組，類似將其他 repo 當作套件使用的概念。
