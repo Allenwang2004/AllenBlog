@@ -20,13 +20,13 @@ image: /images/_.jpeg
 
 所謂域名其實就只是一個字串，它被 DNS 解析後成為 IP 才有意義，所以在 Namecheap 的 Advancesd DNS 上，要讓域名指到 Vercel 的伺候器 IP
 
-![截圖 2025-07-04 下午6.51.37.png](/images/website deployment/1.png)
+![截圖 2025-07-04 下午6.51.37.png](/images/website_deployment/1.png)
 
 但如果只有這樣，明顯不夠．因為這麼多個專案在 Vercel 上運行，這個 IP 對應了這麽多網域，怎麼知道是哪個．
 
 Vercel 是透過**反向代理**的方式，讓同一個 IP 可以服務這麼多網域，所以我們還需要在 Vercel 這邊綁定域名．
 
-![截圖 2025-07-04 下午6.51.47.png](/images/website deployment/2.png)
+![截圖 2025-07-04 下午6.51.47.png](/images/website_deployment/2.png)
 
 簡單來說 它的路徑是這樣
 
@@ -60,7 +60,7 @@ Vercel 回傳你的網站內容 (HTML/CSS/JS)
 
 ### **自動生成 Sitemap（建議）**
 
-使用 [next-sitemap](/images/website deployment//www.npmjs.com/package/next-sitemap) 套件：
+使用 [next-sitemap](/images/websit_deployment//www.npmjs.com/package/next-sitemap) 套件：
 
 ```
 npm install next-sitemap
@@ -257,6 +257,6 @@ site:yourdomain.com
 
 成功的話會像這樣
 
-![Screenshot 2025-08-24 at 1.30.41 AM.png](/images/website deployment/Screenshot_2025-08-24_at_1.30.41_AM.png)
+![Screenshot 2025-08-24 at 1.30.41 AM.png](/images/website_deployment/Screenshot_2025-08-24_at_1.30.41_AM.png)
 
 這篇的內容大概就這樣囉．
