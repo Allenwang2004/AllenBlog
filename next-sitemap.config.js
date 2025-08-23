@@ -1,5 +1,5 @@
 /** @type {import('next-sitemap').IConfig} */
 module.exports = {
-  siteUrl: 'https://allen-blog-omega.vercel.app',
+  siteUrl: 'https://allenwang.it.com',
   generateRobotsTxt: true,
 };

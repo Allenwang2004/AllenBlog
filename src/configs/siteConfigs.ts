@@ -1,4 +1,4 @@
-const fqdn = 'https://allen-blog-omega.vercel.app';
+const fqdn = 'https://allenwang.it.com';
 const logoPath = '/logo.jpg';
 const bannerPath = '/og-image.jpg';
 
