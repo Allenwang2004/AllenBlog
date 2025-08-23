@@ -67,6 +67,8 @@ export const getStaticProps: GetStaticProps<Props> = async (context) => {
   };
 };
 
+const POSTS_PER_PAGE = 9;
+
 const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
   const { t } = useTranslation(['indexPage', 'common']);
   const { theme } = useTheme();
@@ -75,6 +77,9 @@ const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
   useEffect(() => setMounted(true), []);
 
   useCommandPalettePostActions(commandPalettePosts);
+
+  // 只顯示前 9 篇
+  const pagedPosts = posts.slice(0, POSTS_PER_PAGE);
 
   return (
     <LayoutPerPage>      
@@ -119,8 +124,19 @@ const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
             <h2>{t('latest-posts')}</h2>
           </div>
 
-          <PostList posts={posts} />
+          <PostList posts={pagedPosts} />
         </div>
+        {/* 分頁連結 */}
+        {posts.length > POSTS_PER_PAGE && (
+          <div className="flex justify-center my-8">
+            <a
+              href="/page/2"
+              className="px-6 py-3 font-medium rounded text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800 transition border border-gray-300 dark:border-gray-700"
+            >
+              Next Page →
+            </a>
+          </div>
+        )}
         <div className="prose prose-lg my-16 mx-auto text-center dark:prose-dark max-w-3xl">
           <a
             href="/resume"
