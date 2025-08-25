@@ -1,0 +1,87 @@
+---
+title: pre-commit
+description: 使用 Husky pre-commit 優化 CI flow
+slug: pre-commit-post
+date: 2025-08-25
+type: Post
+image: /images/download.png
+---
+
+# Pre-commit
+
+除了透過 CI 在程式碼送到遠端時檢查，開發者可以事先在本地端用 **pre-commit**  攔截問題，避免無效的提交推送到伺服器，這麼做的原因是因為使用 CI 的速度通常較慢，如果能提早攔截問題，對團隊或是個人開發效率都會有所提升．
+
+## Husky
+
+Husky 是個 npm 套件，它讓使用者可以用直覺的操作方式註冊各式 hooks 事件，將各式的處理配置於各個 hooks 中，pre-commit 就是一個 hooks，除此之外，還有像是 commit-msg, post-commit 都是，但這篇只會針對 pre-commit 做介紹
+
+### 安裝 Husky
+
+```bash
+npm install husky --save-dev
+```
+
+### 初始化 Husky
+
+進入專案資料夾後，啟用 git hooks
+
+```bash
+npx husky init
+```
+
+這一步會
+
+- 在根目錄下創建 .husky/ 目錄
+- 給你一個 pre-commit 的範例
+- 在 package.jsom 加上
+    
+    ```bash
+    "scripts": {
+      "prepare": "husky"
+    }
+    ```
+    
+
+接者就可以在 pre-commit 裡寫下需要檢查的 task
+
+例如
+
+```bash
+npm run build || exit 1
+```
+
+這樣一來，每次 git-commit 時，它就會運行 npm build 來攔截錯誤．
+
+沒有報錯的輸出如下
+
+![Screenshot 2025-08-25 at 2.04.25 PM.png](/images/pre-commit/Screenshot_2025-08-25_at_2.04.25_PM.png)
+
+可以再進一步包裝成 script，正確 pre-commit 後會自動提交
+
+程式碼如下
+
+```bash
+#!/bin/zsh
+
+MESSAGE=$1
+
+git add
+git commit -m "message" || exit 1
+git push origin main
+```
+
+在終端執行
+
+```bash
+./git-push.zsh "commit message"
+```
+
+如果想在 python 使用外部指令，在終端執行上面的指令
+
+```bash
+import subprocess
+
+msg = "input message"
+
+subprocess.run(["./git-push.zsh", msg], check=True)
+```
