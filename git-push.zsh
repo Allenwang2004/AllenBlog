@@ -1,5 +1,5 @@
 #!/bin/zsh
-
+cd /Users/coconut/AllenBlog || exit 1 
 MESSAGE=$1
 
 git add .
