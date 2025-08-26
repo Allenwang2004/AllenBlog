@@ -1,0 +1,122 @@
+---
+title: DigitalOcean
+description: 如何使用Digital Ocean上的 Droplet 部署交易系統和監控平台
+slug: digitalocean-post
+date: 2025-08-27
+type: Post
+image: /images/digital_ocean.png
+---
+
+# Digital Ocean
+
+**這一篇來介紹一下 DigitalOcean 這個平台**
+
+**DigitalOcean** 是一個 **雲端服務平台 (Cloud Service Provider, CSP)**，主要針對 **開發者、中小型企業、初創公司** 提供 **簡單、價格透明、容易上手** 的雲端基礎設施服務。
+
+它的定位跟 AWS、GCP、Azure 類似，但更強調 **易用性** 與 **成本可控**。
+
+## **Droplets**
+
+其中最常被用的就是 **Droplets** 這項服務。
+
+這就像是租用了一台雲端伺服器，你可以安裝想要的系統，在上面架設網站、API 或是系統服務。
+
+像我的話，我在上面架了 **交易系統**，就可以做到 **24 小時全天候的交易**，還能同步架設 **資產監控後台**，是一個非常好用的服務。
+
+接下來會說明我是怎麼在 DigitalOcean 上 **部署監控後台**。策略的部分就看各自喜好，可以自己寫，或用開源的交易系統（這塊需要時間摸索，本文不展開）。
+
+## **註冊 DigitalOcean**
+
+流程請參考 : [https://websitebuilder.com.tw/虛擬主機/digital-ocean/](/images/digitalocean//websitebuilder.com.tw/%E8%99%9B%E6%93%AC%E4%B8%BB%E6%A9%9F/digital-ocean/)
+
+至於 Droplet 規格依需求挑選，我目前使用：
+
+- Regular CPU
+- 1 vCPU
+- 1 GB RAM
+- 25 GB SSD
+- 1 TB Transfer
+- **$6 / 月**
+
+## **用 SSH 連線到 Droplet**
+
+本地端產生金鑰，並加到 Droplet（或在建立 Droplet 時直接貼公鑰）：
+
+```
+# 本地端產生金鑰（一路 Enter）
+ssh-keygen -t rsa -b 4096 -C "you@example.com"
+
+# 連線（用你的 IP）
+ssh -i ~/.ssh/id_rsa root@<YOUR_DROPLET_IP>
+```
+
+成功會看到像這樣的登入畫面
+
+![Untitled.jpg](/images/digitalocean/Untitled.jpg)
+
+## **建置監控平台（PostgreSQL + Grafana）**
+
+我採用 **Python 把策略即時資產寫進資料庫** → **Grafana 從資料庫畫圖** 的做法
+
+### **建立 docker-compose.yml**
+
+- 若只是測試：可移除 volumes，資料會存在容器內，刪容器就清空。
+
+啟動：
+
+```
+docker compose up -d
+```
+
+## **透過 Binance API 取得帳戶資產 → 寫入 DB**
+
+### **.env**
+
+在目錄建立 .env：
+
+```
+BINANCE_API_KEY=你的Key
+BINANCE_API_SECRET=你的Secret
+```
+
+### **insert_assets.py**
+
+- 把**策略資產換算成 USDT** 再加總，並寫入 PostgreSQL。
+
+## **Grafana 連線與儀表板**
+
+1. 打開瀏覽器：http://IP:port
+    
+    更改帳密 admin/admin
+    
+2. **新增資料來源**：PostgreSQL
+    - Host：伺服器IP或localhost:5432
+    - Database：略
+    - User：略
+    - Password：略
+    - Save & Test → 成功
+3. **建立 Dashboard / Panel**，查詢資產曲線（Time series）
+
+- Spot：
+
+```
+SELECT ts AS "time", spot_balance
+FROM strategy1_assets
+ORDER BY ts;
+```
+
+- Futures：
+
+```
+SELECT ts AS "time", futures_balance
+FROM strategy2_assets
+ORDER BY ts;。
+```
+
+完成到這邊，就可以得到像底下這樣的結果
+
+![Screenshot 2025-08-26 at 10.25.57 PM.png](/images/digitalocean/Screenshot_2025-08-26_at_10.25.57_PM.png)
+
+監控平台的好處是，可以針對每一個策略個別監控，所以事實上是會有好幾個表，那這樣能更清楚看到策略是否失效，對交易員來說是非常重要的．
+
+那這篇就先說明到這．之後有機會也會介紹我使用的交易系統．
