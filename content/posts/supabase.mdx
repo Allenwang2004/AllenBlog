@@ -1,0 +1,88 @@
+---
+title: Supabase
+description: 如何使用 Supabase 建立 服務後端
+slug: supabase-post
+date: 2025-08-27
+type: Post
+image: /images/supabase.jpg
+---
+
+# Supabase
+
+這一篇來介紹 Supabase 這個平台，因為自己有寫一些專案需要然後需要上架，不需用使用像 AWS 
+
+等大型服務的雲平台，不論是在資源有效利用或是價格上，Supabase 都會是一個很好的選擇．
+
+### 登入並註冊
+
+這一步不多做說明，網路上有很多資源
+
+### Billing
+
+Supabase 他有提供 Free plan 給使用者，他的使用量限制如下 :
+
+![Screenshot 2025-08-27 at 12.17.21 PM.png](/images/supabase/Screenshot_2025-08-27_at_12.17.21_PM.png)
+
+以 Databse 來說，0.5 GB 大概就是 500,000,000 bytes，假設 Table 欄位很多，然後都是 8 bytes 塞好塞滿，加上 overhead，抓 512 byte 好了，那也是可以 1000,000 筆資料，如果自己做的小型服務，其實是非常夠用的．
+
+### Project
+
+在 Project 頁面這邊，可以新增專案，然後盡量選擇跟你服務地區較近的伺服器位置，效能上會更好，不然可能會有比較大的延遲問題．
+
+### Intergration
+
+這邊先額外插入一個話題是 Supabase 有提供整合的服務，可以幫你把環境變數直接整合到你的 Github repo 或是 Vercel 專案上，但前面的串接還是要自己完成．
+
+### Connect
+
+![Screenshot 2025-08-27 at 12.57.43 PM.png](/images/supabase/Screenshot_2025-08-27_at_12.57.43_PM.png)
+
+Supabase 很好心的提供了各式語言和框架下，應該要怎麼連接的說明
+
+### 主要功能
+
+![Screenshot 2025-08-27 at 1.01.53 PM.png](/images/supabase/Screenshot_2025-08-27_at_1.01.53_PM.png)
+
+- Table editor & SQL Editor
+    
+    在 Table editor 跟 SQL Editor 這邊，可以去創建你要的資料表然後寫一個 queries 做測試
+    
+- Databse
+    
+    在這裡可以 Visualize schema，還有待會提到的 function，對 Database 的 management 都寫在這裡了
+    
+- Authentication
+    
+    這就是一個完整的帳號系統，包含
+    
+    - 各類登入方式
+    - session 管理
+    - 使用者資料管理
+    - Webhook 等等
+    
+    直接省去在資訊服務開發的時候，建立帳號系統的大量時間
+    
+- Storage
+    
+    就是一個 **物件儲存服務** ，類似 **AWS S3**，專門放檔案（圖片、影片、PDF…）。
+    
+    上傳後檔案會獲得 URL，就可以在網頁前端或是 App 前端顯示
+    
+- Function
+    
+    就是 **Serverless Functions**，跑在 Supabase 的 **全球 Edge Node** 上
+    
+    可以在上面寫 API，設定排程，撰寫 Webhook 等等
+    
+- Realtime
+    
+    其實就是就是在 事件發生時 → 透過 WebSocket 將 Postgres 資料表推送到前端，做到即時同步的功能
+    
+
+### Report
+
+除了內建關於記憶體容量或是 Function calls 的次數外，也可以針對註冊人數做自己的 custom report，或者是其他想要觀察趨勢等等都可以在這裡做到．
+
+大概主要功能就是這些，這篇沒有針對程式碼開發做說明，但如果有寫過後端經驗的人，看完這篇之後，使用起來應該會蠻順手的，那他也確實對於新創或是個人專案的後端是非常友善的，可以在發展企業規模前可以有一個產品輸出，不用到使用像 AWS, Azure, GCP 這些大型服務．
+
+那這篇文章就到這邊，之後也會出一個完整專案介紹的文章．
