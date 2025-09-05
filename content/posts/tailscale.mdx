@@ -1,0 +1,85 @@
+---
+title: Tailscale
+description: 如何用 tailscale 連接 remote server
+slug: tailscale-post
+date: 2025-09-06
+type: Post
+image: /images/Screenshot 2025-09-06 at 1.15.31 AM.png
+---
+
+# Remote Server
+
+這篇文章會介紹如何建立和遠端 server 的 ssh 連線，會想怎麼做是因為想打造自己的 Homelab 雖然目前是以舊 PC 作為 server ，但未來也希望可以增加更多設備，用更好的顯卡，做到更多事情．
+
+### 使用情境
+
+因為我使用的 遠端 server 接的是網路線，它是拿到路由器分配的內網 ip，內部 ip 想上網是透過 NAT，概念如下圖所示 : 
+
+![Screenshot 2025-09-05 at 11.52.06 PM.png](/images/tailscale/Screenshot_2025-09-05_at_11.52.06_PM.png)
+
+NAT 會將內網 ip 轉為 公網 ip，電信的 ISP 才會執行傳遞的封包
+
+但如果是外部想要連線進來，路由器不會知道要連到哪個內網 ip，所以這就會導致無法連線，有一個做法是使用 VPN 來解決，像下圖這樣
+
+![Screenshot 2025-09-06 at 12.29.31 AM.png](/images/tailscale/Screenshot_2025-09-06_at_12.29.31_AM.png)
+
+但我在這邊使用一個更快速的方法 Tailscale， 這個工具來解決問題，他跟 VPN 不一樣，他不需要一個 VPN router，只需要在設備建立 client ，然後透過 UDP hole punching，雙方同時向一個協調伺服器發送封包，建立映射表，之後彼此就能直連，也就是用 NAT 穿透的方式，直接建立 P2P 的通道，類似下圖：
+
+![cdd753282121c1279a392aca86adcb6d0a5d1c80-1320x775.svg](/images/tailscale/cdd753282121c1279a392aca86adcb6d0a5d1c80-1320x775.svg)
+
+接下來就來說明實作：
+
+在遠端 server 上：
+
+```
+# 安裝 Tailscale
+curl -fsSL https://tailscale.com/install.sh | sh
+
+# 登入並啟用 會得到一個 ip
+sudo tailscale up
+
+# 確保重新啟動後會重開
+sudo systemctl enable tailscaled
+```
+
+可以用
+
+```python
+tailscale ip
+```
+
+來查看是否取得內網 ip
+
+### **啟動 SSH 服務**
+
+安裝並啟動 OpenSSH：
+
+```
+sudo apt update
+sudo apt install openssh-server -y
+sudo service ssh start
+```
+
+### **外部電腦**
+
+在外部電腦裝 Tailscale，然後一樣 Connect device
+
+就會得到像下面這樣 ( 我是用 舊PC 作為 server )
+
+![Screenshot 2025-09-06 at 12.24.34 AM.png](/images/tailscale/Screenshot_2025-09-06_at_12.24.34_AM.png)
+
+兩台電腦都已經獲得內網 ip
+
+### 開啟 server防火牆
+
+```python
+sudo ufw allow ssh
+```
+
+接著就可以嘗試連線
+
+```
+ssh <帳號>@100.xxx.xxx.xxx
+```
+
+透過 **Tailscale**，可以快速建立屬於自己的工作內網，不論是一台筆電，還是未來逐步擴增到多台 server，都能以相同簡單的方式進行管理。這不僅適合個人開發者隨時遠端存取環境，也能讓團隊更輕鬆地串接彼此的資源。
