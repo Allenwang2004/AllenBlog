@@ -67,7 +67,7 @@ export const getStaticProps: GetStaticProps<Props> = async (context) => {
   };
 };
 
-const POSTS_PER_PAGE = 9;
+const POSTS_PER_PAGE = 6 ;
 
 const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
   const { t } = useTranslation(['indexPage', 'common']);

@@ -9,7 +9,7 @@ import LayoutPerPage from '@/components/LayoutPerPage';
 import PostList, { PostForPostList } from '@/components/PostList';
 import { allPostsNewToOld } from '@/lib/contentLayerAdapter';
 
-const POSTS_PER_PAGE = 9;
+const POSTS_PER_PAGE = 6;
 
 type Props = {
   posts: PostForPostList[];
