@@ -1,6 +1,10 @@
+import dynamic from 'next/dynamic';
 import { GetStaticPaths, GetStaticProps, NextPage } from 'next';
+import { useTheme } from 'next-themes';
 import { useTranslation } from 'next-i18next';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
+import { useEffect, useState } from 'react';
+
 import LayoutPerPage from '@/components/LayoutPerPage';
 import PostList, { PostForPostList } from '@/components/PostList';
 import { allPostsNewToOld } from '@/lib/contentLayerAdapter';
@@ -13,10 +17,18 @@ type Props = {
   totalPages: number;
 };
 
+const RippleBackground = dynamic(() => import('@/components/Water'), { ssr: false });
+const RippleBackground2 = dynamic(() => import('@/components/Water2'), { ssr: false });
+
 const Page: NextPage<Props> = ({ posts, page, totalPages }) => {
   const { t } = useTranslation(['indexPage', 'common']);
+  const { theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   return (
     <LayoutPerPage>
+      {mounted && theme === 'dark' && <RippleBackground />}
+      {mounted && theme !== 'dark' && <RippleBackground2 />}
       <div className="my-4 divide-y divide-gray-200 transition-colors dark:divide-gray-700">
         <div className="prose prose-lg my-8 dark:prose-dark">
           <h2>{t('latest-posts')}</h2>
