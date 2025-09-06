@@ -1,0 +1,112 @@
+---
+title: ARC-AGI
+description: 語言模型如何產生推理能力
+slug: arc-agi-post
+date: 2025-09-07
+type: Post
+image: /images/Screenshot 2025-09-07 at 6.10.18 AM.png
+---
+
+# ARC-AGI
+
+### 什麼是 ARC - AGI
+
+ARC-AGI 是一個用在挑戰 AI 推理的資料集，只有少量輸入及輸出的範例，就要從中去推理出轉換規 則．
+
+目前在文章撰寫的到當下， ARC-AGI 正在 Kaggle 上進行比賽，其中 [Giotto.ai](/images/arc-agi//Giotto.ai)  取得了大幅領先的 24.58 ％ 的準確率．遠遠超出市面上通用的其他模型，非常好奇它是怎麼做的，所以這一系列文章主要就是紀錄如何訓練一個推理模型來完成這項推理挑戰．
+
+在進入實作之前，這篇會先來理解何謂語言模型的推理．
+
+### 何謂推理能力 ( Reasoning )
+
+推理能力就是指語言模型具有了 “思考” 的能力，像底下這樣．
+
+![Screenshot 2025-09-07 at 3.39.16 AM.png](/images/arc-agi/Screenshot_2025-09-07_at_3.39.16_AM.png)
+
+現在使用 gpt-o5，會有一個 Thinking 的過程，至於它跟人類的思考跟人類一不一樣，是一個大家都在討論的問題，但這邊就直接用推理來解釋這個過程．
+
+這樣的方式也是 Test-time compute 一種，也就是模型除了在 train-time 訓練之外，在 test time 也會需要大量算力來給出答案．
+
+### 打造推理的方式
+
+底下提供四種方式
+
+- CoT ( Chain of Though )
+- 給模型推理工作流程
+- Imitation Learning
+- Reinforcement Learning
+
+## CoT
+
+推理模型做的是 Long CoT，也就是給模型範例，包含題目，思考流程和答案，等於是給它一個人類思考的流程，叫他按照那個流程去產出回答，這個方法已經被使用很久了，這邊就不多做說明．
+
+## 給模型推理工作流程
+
+等於是讓模型回答同一個問題好幾次，相信遲早會拿到正確答案
+
+可以透過
+
+- Majority Vote
+- Confidence
+
+來決定哪一個輸出作為正確答案
+
+還有一種方法是用 Verifier 來對每次輸出得到評分，選擇評分最高的，
+
+那這個 Verifier 要怎麼訓練呢
+
+首先，先把訓練資料丟給模型，得到 output 是否正確，把這個結過 給另一個模型訓練 得到 Verifier，像下圖：
+
+![Screenshot 2025-09-07 at 4.10.48 AM.png](/images/arc-agi/Screenshot_2025-09-07_at_4.10.48_AM.png)
+
+另外讓模型產生多個答案還有分成 Parallel 跟 Sequential 兩種模式
+
+上面是用 Parallel 的方式， Sequential 就是根據前一次 output 再產生下一次 out
+
+但前面所說的都是對結果做驗證，這樣每次都等到結果才能驗證，太浪費時間了，所以針對推理過程還可以細分不同 step ，針對每一個 step 都去做驗證．
+
+所以就需要 Process Verifier 針對每一個步驟做驗證，那因為只有 input 跟 output ，又要如何知道中間的 step 是否是對的．
+
+解決的方法就是通過多次解題，針對每次通過 特定step 的結果做統計，就可以知道它得到正確答案的機率，那機率又要多高才能保留這個 step 呢 ?
+
+可以使用 Bean search 這個方法，針對在同一個位階的 step 選擇正確機率前幾高的 step 保留下來，除此之外，也可以用 MCTS 來做選擇．
+
+前面都是不用訓練參數的方式，底下說明的是需要訓練參數的方法．
+
+## Imitation Learning
+
+這個概念就是教模型推理過程
+
+方法是用一個語言模型產出 reasoning process，再拿這個 reasoning process 當作 training data 給另一個語言模型做訓練
+
+但有一個小問題就是這個 reasoning process 一定是對的嗎，因為有可能答案只是剛好答對而已，所以針對 reasoning process 要做驗證，可以透過 supervise learning 也可以用 reinforcement learning，來得到正確的 reasoning process．
+
+但這樣又延伸一個問題就是，如果每一個 step 都是對的，語言模型會不知道遇到錯誤 step 要怎麼處理．
+
+所以這裡提出一個叫 Stream of search 的方法，它希望學習到錯誤的 step，像下圖 :
+
+![Screenshot 2025-09-07 at 5.43.00 AM.png](/images/arc-agi/Screenshot_2025-09-07_at_5.43.00_AM.png)
+
+提供了包含錯誤路徑跟正確路徑，讓模型學習，也叫做 Journey learning．
+
+### Knowledge Distillation
+
+因為現在已經有模型具有推理能力，所以其實可以直接用這些模型去教 Foundation model，讓他學習如何推理，目前也已經取得成功．
+
+## RL
+
+針對 Foundation model 輸出結果，如果答案是對的，就會得到 reward，所以中間的 reasoning process 是不重要的，只在意最後的結果，這也是 DeepSeek-R1的做法．
+
+它的缺點就是推理過程不容易理解， Deepseek 的解決方法如下 :
+
+![Screenshot 2025-09-07 at 5.55.57 AM.png](/images/arc-agi/Screenshot_2025-09-07_at_5.55.57_AM.png)
+
+先產出一個 可以推理的模型 DeepSeek-R1-Zero，對這個推理模型產出的推理過程做修正，再丟給 Foundation model 做訓練，產出一個可以推理的新模型 A，最後再針對語言限制去做 RL 得到模型 B
+
+接著用這個模型產出多個答案，再丟回 Foundation model 再做 imitation learning 得到 C，最後再針對一些特徵限制做 RL，得到最終的模型 DeepSeek-R1．
+
+![Screenshot 2025-09-07 at 5.55.23 AM.png](/images/arc-agi/Screenshot_2025-09-07_at_5.55.23_AM.png)
+
+那在這裡最重要的應該是 Foundation model 的選擇，因為 RL 是讓模型可以有更高機會選到對的，但如果模型本身就已經不強，那他能提升的效果也很有限．
+
+這篇文章就先講到這，之後會寫一篇來介紹針對 ARC-AGI 設計的推理模型訓練流程和心得．
