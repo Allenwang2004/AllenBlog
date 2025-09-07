@@ -2,12 +2,11 @@
 title: LLM_Training
 description: 如何提高大型語言模型訓練效率
 slug: llm_training-post
-date: 2025-09-08
+date: 2025-09-09
 type: Post
 image: /images/deepspeed.png
 ---
 
-# LLM Training
 
 和訓練神經網路不一樣，訓練 LLM 時沒辦法把它全部都塞到 GPU 裡，因為 LLM 實在是太大了，
 
@@ -61,8 +60,6 @@ cython 的概念
 
 ## Qunatization
 
-一個 AI 模型的壓縮技術
-
-[https://chih-sheng-huang821.medium.com/ai模型壓縮技術-量化-quantization-966505128365](/images/llm_training//chih-sheng-huang821.medium.com/ai%E6%A8%A1%E5%9E%8B%E5%A3%93%E7%B8%AE%E6%8A%80%E8%A1%93-%E9%87%8F%E5%8C%96-quantization-966505128365)
+AI 模型的壓縮技術，先壓縮成 4bits, 8bits 等等較小的空間，需要使用時再放大
 
 以上都是在優化大型語言模型訓練的方法，讓我們可以在有限的資源下，訓練出最好的模型．
