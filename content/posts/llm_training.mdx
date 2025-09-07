@@ -1,0 +1,68 @@
+---
+title: LLM_Training
+description: 如何提高大型語言模型訓練效率
+slug: llm_training-post
+date: 2025-09-08
+type: Post
+image: /images/deepspeed.png
+---
+
+# LLM Training
+
+和訓練神經網路不一樣，訓練 LLM 時沒辦法把它全部都塞到 GPU 裡，因為 LLM 實在是太大了，
+
+但可以透過同時使用多個 GPU 來解決這個問題．
+
+和一般的神經網路訓練是一樣的，神經網路的訓練像底下呈現 :
+
+![IMG_0372.jpg](/images/llm_training/IMG_0372.jpg)
+
+訓練 LLM 就只是把中間的神經網路換成 LLM
+
+但問題是 LLM 所需要的記憶體空間實在是太大了，以一個 8B 的模型舉例
+
+![IMG_0373.jpg](/images/llm_training/IMG_0373.jpg)
+
+先不論 input ，光模型本身就已經會塞不下了，如果再考慮每層都會產出 activation，一共是 32 層 layers ，就會是 TB 等級的容量．
+
+那針對 activation ，可以使用 activation recomputation 來優化
+
+針對 gradient 的話 則是可以使用 gradient accumulation 來近似大的 batch size 得到的 gradient
+
+前面講的是針對計算上的優化，接下來就會來說怎麼用多張 GPU 來優化訓練過程
+
+## DeepSpeed
+
+它是一個由微軟開發的開源深度學習優化庫，那他用的方法就是將前面提到包含 optimizer, gradient, LLM weight，把它分到多個 GPU 之間，GPU 跟 GPU 之間是可以通信的，他做到的事情也就是 Model Parallelism，某種程度上，他就是花費了 communication 的成本，但節省了單一 GPU 所需要的空間．
+
+他一共分成三個層次
+
+1. 先切分在 global step 才會用到的 optimizer
+2. 切分 gradient 和 LLM weights
+3. 切分訓練時 16bits 的 LLM weights
+
+底下是它的結果
+
+![IMG_0375.jpg](/images/llm_training/IMG_0375.jpg)
+
+除此之外，他還有 offload 的技術，就是再加上 CPU 來存放，但因為 CPU RAM 跟 GPU RAM 之間的通信速度太慢，並不適合訓練，所以建議不要用．
+
+## Flash Attention Algorithm
+
+Flash Attention 是一種注意力算法，旨在提高基於 Transformer 的模型的效率，使其能夠處理更長的序列長度並更快地進行訓練和推理。它通過減少計算量和內存使用來實現這一點。
+
+等我修完大型語言模型後會再來補充這裡的數學細節 …
+
+## Light Kernel
+
+把 Pytorch 的 kernel function 代碼部分用 low-level 的 Triton 代替，就有點像用 C++ 優化 python 成
+
+cython 的概念
+
+## Qunatization
+
+一個 AI 模型的壓縮技術
+
+[https://chih-sheng-huang821.medium.com/ai模型壓縮技術-量化-quantization-966505128365](/images/llm_training//chih-sheng-huang821.medium.com/ai%E6%A8%A1%E5%9E%8B%E5%A3%93%E7%B8%AE%E6%8A%80%E8%A1%93-%E9%87%8F%E5%8C%96-quantization-966505128365)
+
+以上都是在優化大型語言模型訓練的方法，讓我們可以在有限的資源下，訓練出最好的模型．
