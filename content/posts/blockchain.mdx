@@ -1,0 +1,71 @@
+---
+title: Blockchain
+description: 研究區塊鏈和智能合約式如何運作
+slug: blockchain-post
+date: 2025-09-12
+type: Post
+image: /images/blockchain.png
+---
+
+# Blockchain and Smart Contract
+
+因為實習專案需要寫智能合約，所以花了一點時間做了研究，這篇會先介紹什麼是區塊鏈，上面的資料是怎麼被記錄的，以及智能合約是如何部署在區塊鏈上，但因為是做為智能合約開發者，不是做為區塊鏈開發者，只會先了解背後的概念，讓在寫 Dapp 的時候不會覺得背後的 Network 像一個黑盒子一樣，實際的技術細節，不會是這篇的重點，對我來說難度也有點高哈哈．
+
+## 什麼是區塊鏈
+
+區塊鏈是一個去中心化的數據庫和網路，區塊鏈由區塊構成，每一個區塊上面包含資料，等等會介紹最有哪些資料，整條區塊鏈會在透過 P2P ( Peer to Peer ) 網路分發到所有節點上，這些節點都是一個一個伺服器，在所有節點上的區塊鏈都是相同的．
+
+![Screenshot 2025-09-12 at 1.01.36 AM.png](/images/blockchain/Screenshot_2025-09-12_at_1.01.36_AM.png)
+
+## 資料是如何被記錄
+
+要說明區塊鏈上面的資料，會需要底下幾個觀念
+
+### Hash
+
+在給定的 data 下，SHA256 hash 會產生一個 fingerprint，所以當資料一樣時，hash 就會是一樣的，換句話說 hash 也是唯一的．
+
+### Block
+
+底下舉一個最簡單的 block 的例子，以 PoW 背景為例 ( 比特幣所使用的 )
+
+![Screenshot 2025-09-12 at 12.52.44 AM.png](/images/blockchain/Screenshot_2025-09-12_at_12.52.44_AM.png)
+
+包含了 Block number, Nonce, Tx , Prev, Hash ， Hash 是由 前面三者透過剛剛說的 SHA256 產生，如果是以 PoＷ 而言，合格的區塊就 Hash 會是以 0000… 開頭，所以就是要找到 Nonce 是什麼數字的時候會符合，這就是挖礦，當然實務上的問題會比這個難．
+
+### **Consensus algorithm**
+
+共識算法定義如何去驗證區塊和決定哪一個節點可以出塊，最一開始的 PoW 是透過 Mining 去挖出 Nonce 來符合 hash 開頭是 0000…，所以需要礦工來解碼，但如果是 PoS ，他是透過質押來決定下一個區塊．他所存儲的資料也不太相同，比特幣系統使用的是 PoW，以太坊則是 PoS．
+
+### Digital Signatures
+
+每個帳號都會有一個 public key 跟 private key ， public key 也就是地址，任何人想要從某個地址拿錢．都需要經過 signature，它是由 private key 和 message 所組成的，接受到 Signature 後解碼來確認 signature 是否合法．
+
+## EVM
+
+在提到智能合約前，首先就要提到 EVM，EVM 就是一個虛擬機器專門來處理智能合約的 bytecode，EVM存在每一個Ehterum節點中，負責執行存放在block的bytecode。EVM具有圖靈完備(Truing Completeness)的特性。圖靈完備是敘述機器可以將一切可計算問題(Computational Problem)，不論時間長短皆可以計算出結果。可計算問題是指給定一個正整數n請判斷是否為質數這類的數學問題。這台機器具有無限的儲存空間、可增減的運算能力、條件判斷(if-else)以及重複(loop)的能力。EVM具有上述能力，所以EVM是圖靈完備的機器。
+
+可以把Ethereum想像成一台超級電腦。理論上這台Ethereum擁有無限大的儲存空間(storage space)，無限大的運算能力(compute capability)。我們可以編寫任何我們自己要的程式並放到這台超級電腦上面運行。這台超級電腦由Blockchain技術建構，放在上面的資料都難以被篡改。因為去中心化的結構，沒有任何一方可以掌控這台電腦。Ethereum是一個基於Blockchain技術所建構，易於運行任何Dapp的去中心開發平台。
+
+EVM 背後的邏輯相當複雜，他其實就像是一個 OS ，對於當初寫出來的人，我真的很懷疑他們的腦袋到底是怎麼構成的，我們光 trace code 就要花上一個禮拜以上的東西，他們竟然在 10 年前就可以寫出來，真的是令人感到不可思議．
+
+## Smart Contract
+
+智能合約其實就是運作在區塊鏈上的合約，他會自動化的幫你完成代幣的轉移，這裡的代筆就包含了虛擬貨幣, NFT 等等的．
+
+### 合約是如何部署的
+
+寫好 smart contract 程式碼，經過編譯後會得到兩個東西。一個是編譯過所得 bytecode，另一個就是json格式的ABI文件。當開始要佈署我們的 smart contract 到 Ethereum blockchain 中，就必須用剛剛創造出來的 ABI 當成是一個殼，把 bytecode 放在 data 中，然後再丟到Ethereum Blockchain Network 等待節點幫我們把 contract 寫到 block 中。當 contract 佈署好之後會自動生成一個帳戶，並會回傳這個帳戶的 address，這就是俗稱的合約帳戶(contract account)。我們透過合約帳戶的address 來跟 smart contract 做互動。
+
+### 如何和合約互動
+
+直接以流程說明
+
+1. 使用者 /應用發交易 → 送到節點（或節點 pool / mempool）。
+2. 節點驗證交易格式、簽名、nonce、餘額是否夠等。
+3. 共識機制決定哪個節點（validator / miner）有權產生下一個區塊。
+4. 出塊者選從 mempool 裡若干交易打包成區塊；他使用 EVM 來執行裡面每筆交易 → 得到變更狀態 + logs + gas 消耗等等。
+5. 出塊者產生區塊頭與區塊體（包含交易+回執 receipts/history/logs 等），並廣播這個完整的區塊給其他節點。
+6. 其他節點收到區塊後，用 EVM 再次執行所有交易（驗證交易結果是否與出塊者一致）→ 驗證這個區塊是否合法（state 根 hash 是否與區塊 header 的 state root 匹配等）→ 若合法，就把它加到自己的區塊鏈並更新狀態。
+
+仔細去研究過後會發現這背後是一個很複雜很複雜的結構，這也是為什麽會有那麼多人還是支持去中心化的發展，因為他的確是有強大的技術底層，只是炒幣和交易蓋過了這件事情，在研究區塊鏈的時候，就很像之前在研究作業系統，好像懂了又好像沒有懂，其實是有些開源的專案，我可以去寫一些測試來研究，但目前在工作上，畢竟做的是 Dapp 開發，只需要知道大概的邏輯，就像在開發 App 也不需用真的完全掌握 作業系統的背後運作，但了解之後，也可以幫助我之後開發時可以更清楚區塊鏈他的使用場境，未來構思新專案的時候，也可以更符合背後的技術支持．
