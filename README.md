@@ -1,76 +1,75 @@
 # AllenBlog
 
-以 Next.js 12 + Contentlayer 打造的個人部落格 / 履歷網站，內容以 MDX 撰寫，並支援中／英雙語切換。
+A personal blog / resume site built with Next.js 12 and Contentlayer. Content is written in MDX, with a bilingual (Chinese / English) UI.
 
-## 技術棧
+## Tech Stack
 
-- **框架**：Next.js 12（Pages Router，非 App Router）
-- **內容管理**：[Contentlayer](https://www.contentlayer.dev/) — 將 `content/posts/*.mdx` 編譯為型別化的 `Post` 物件
-- **樣式**：Tailwind CSS（`@tailwindcss/typography` 處理文章排版、`next-themes` 處理深色模式）
-- **多語系**：`next-i18next`（UI 文案）+ Next.js 內建 `i18n` routing（`en` / `zh-TW`）
-- **其他**：`kbar`（指令面板 / 搜尋）、`@giscus/react`（留言）、`resend`（Email 訂閱 API）、`next-sitemap`、RSS/Atom/JSON Feed 產生器
+- **Framework**: Next.js 12 (Pages Router, not App Router)
+- **Content**: [Contentlayer](https://www.contentlayer.dev/) — compiles `content/posts/*.mdx` into typed `Post` objects at build time
+- **Styling**: Tailwind CSS (`@tailwindcss/typography` for article typography, `next-themes` for dark mode)
+- **i18n**: `next-i18next` (UI copy) + Next.js's built-in `i18n` routing (`en` / `zh-TW`)
+- **Other**: `kbar` (command palette / search), `@giscus/react` (comments), `resend` (email subscribe API), `next-sitemap`, RSS/Atom/JSON feed generation
 
-## 目錄結構
+## Directory Structure
 
 ```
-content/posts/           # 文章來源（.mdx），Contentlayer 於 build 時掃描
-contentlayer.config.ts   # 定義 Post 的 schema（title、date、language...）
+content/posts/           # Article source (.mdx), scanned by Contentlayer at build time
+contentlayer.config.ts   # Post schema (title, date, language, descriptionEn...)
 src/
-  pages/                 # Next.js 路由
-    index.tsx            # 首頁（文章列表）
-    page/[page].tsx       # 文章分頁
-    posts/[slug].tsx      # 單篇文章頁
-    resume.tsx            # 履歷頁
-    [...pathToRedirectFrom].tsx  # 舊網址轉址
-    api/                  # API Routes（如 subscribe.ts）
-  components/            # UI 元件（Header、Footer、PostBody、CommandPalette...）
-  configs/               # 站台常數（siteConfigs、i18nConfigs、headerConfigs...）
-  lib/                   # 工具函式（contentLayerAdapter、generateRSS、formatDate...）
-  plugins/               # 自訂 rehype/remark 外掛（imageMetadata）
+  pages/                 # Next.js routes
+    index.tsx            # Homepage (hero, work experience, latest posts)
+    page/[page].tsx       # Paginated post list
+    posts/[slug].tsx      # Single post page
+    resume.tsx            # Resume page
+    [...pathToRedirectFrom].tsx  # Legacy URL redirects
+    api/                  # API routes (e.g. subscribe.ts)
+  components/            # UI components (Header, Footer, PostBody, CommandPalette, WorkExperienceSection...)
+  configs/               # Site-wide constants (siteConfigs, i18nConfigs, headerConfigs, workExperienceConfigs...)
+  lib/                   # Utilities (contentLayerAdapter, generateRSS, formatDate...)
+  plugins/               # Custom rehype/remark plugins (imageMetadata)
 public/
-  locales/{en,zh-TW}/    # next-i18next 的 UI 翻譯字串（json）
-  resume.pdf             # 履歷 PDF（直接以 iframe 嵌入 resume 頁）
+  locales/{en,zh-TW}/    # next-i18next UI translation strings (JSON)
+  resume.pdf             # Resume PDF, embedded via iframe on the resume page
 ```
 
-## 內容渲染流程
+## Content Rendering Flow
 
-1. `content/posts/*.mdx` → Contentlayer（`contentlayer.config.ts`）在建置時解析 frontmatter 與內文，產生 `.contentlayer/generated` 內的型別化資料。
-2. `src/lib/contentLayerAdapter.js` 匯出 `allPostsNewToOld`，供 `index.tsx`、`page/[page].tsx` 等頁面取用並依日期排序。
-3. `posts/[slug].tsx` 用 `getStaticPaths`/`getStaticProps` 依 slug 取出單篇文章，交給 `PostLayout` + `PostBody` 渲染 MDX（含 rehype-slug、rehype-prism-plus 等外掛處理標題錨點與程式碼高亮）。
+1. `content/posts/*.mdx` → Contentlayer (`contentlayer.config.ts`) parses frontmatter and body at build time, producing typed data under `.contentlayer/generated`.
+2. `src/lib/contentLayerAdapter.js` exports `allPostsNewToOld`, consumed by `index.tsx`, `page/[page].tsx`, etc., sorted by date.
+3. `posts/[slug].tsx` uses `getStaticPaths` / `getStaticProps` to fetch a single post by slug and renders it via `PostLayout` + `PostBody` (MDX, with rehype-slug and rehype-prism-plus for heading anchors and code highlighting).
 
-## 多語系設計（中文／英文如何分開）
+## i18n Design
 
-專案裡「UI 文案」與「文章內容」是兩套獨立的多語系機制：
+"UI copy" and "article content" are two independent localization mechanisms:
 
-### 1. UI 文案（next-i18next）
-- `next-i18next.config.js` 宣告 `locales: ['en', 'zh-TW']`，`defaultLocale: 'zh-TW'`。這組設定會被 `next.config.mjs` 讀入並傳給 Next.js 的內建 `i18n` router，因此網址會自動依語系加上前綴（如 `/en/...`，`zh-TW` 為預設不加前綴）。
-- 各語系的介面字串放在 `public/locales/{locale}/*.json`（例如 `common.json`、`indexPage.json`），依 namespace 分檔。
-- 每個頁面的 `getStaticProps` 會呼叫 `serverSideTranslations(locale, [...namespaces])`，把當前語系對應的翻譯 JSON 序列化進 props，頁面內再用 `useTranslation()` 的 `t()` 取字串（見 `index.tsx`、`resume.tsx`）。
-- `LanguageSwitch.tsx` 元件透過 `next/link` 的 `locale` prop 切換 `en` ↔ `zh-TW`，並保留目前的 `pathname`/`query`，達成同頁切語系的效果。
+### 1. UI copy (`next-i18next`)
+- `next-i18next.config.js` declares `locales: ['en', 'zh-TW']`. This config is read by `next.config.mjs` and passed to Next.js's built-in `i18n` router, so URLs are automatically prefixed by locale.
+- Per-locale UI strings live in `public/locales/{locale}/*.json` (e.g. `common.json`, `indexPage.json`), split by namespace.
+- Each page's `getStaticProps` calls `serverSideTranslations(locale, [...namespaces])` to serialize the matching translation JSON into props; components read strings via `useTranslation()`'s `t()`.
+- `LanguageSwitch.tsx` toggles `en` ↔ `zh-TW` via `next/link`'s `locale` prop, preserving the current `pathname`/`query`.
 
-### 2. 文章內容（Contentlayer `language` 欄位）
-- `contentlayer.config.ts` 為 `Post` 定義了一個 `language` enum 欄位（選項來自 `src/configs/i18nConfigs.ts` 的 `LOCALES`，預設 `zh-TW`）。
-- 每篇 `.mdx` 可在 frontmatter 標註 `language: en` 或 `language: zh-TW`，代表這篇文章本身是哪個語言撰寫的；沒標註則視為預設語系。
-- 這是「內容層級」的語言標記，與 UI 文案的 i18n 路由是分開運作的兩套機制——即使網址切到 `/en`，實際顯示的文章列表目前仍是同一份 `allPostsNewToOld`（未依 `language` 過濾），語言欄位主要用於文章本身的中英文標示與未來擴充篩選之用。
+### 2. Article content (Contentlayer `language` + `descriptionEn` fields)
+- `contentlayer.config.ts` defines a `language` enum field on `Post` (options from `src/configs/i18nConfigs.ts`'s `LOCALES`, default `zh-TW`), letting each `.mdx` declare what language its body is written in.
+- Post bodies are **not** filtered by the active UI locale — the same `allPostsNewToOld` list is shown regardless of `/en` or `/zh-TW`, with a small language badge (rendered by `PostList.tsx`) indicating each post's actual language.
+- An optional `descriptionEn` frontmatter field lets a post's card summary follow the UI locale even when the full body hasn't been translated: `index.tsx` / `page/[page].tsx` pick `descriptionEn` when `locale === 'en'` and it exists, falling back to `description` otherwise.
 
-### 3. 履歷頁（resume.tsx）
-- 目前僅有單一版本（中文標題/描述寫死在 `resume.tsx`），透過 iframe 直接嵌入同一份 `public/resume.pdf`，並未依語系切換不同 PDF 或文案。
+### 3. Resume page (`resume.tsx`)
+- Single version only — title/description are hardcoded in Chinese, and the same `public/resume.pdf` is embedded via iframe regardless of locale.
 
-## 主要頁面
+## Homepage Layout
 
-| 路徑 | 說明 |
+The homepage (`index.tsx`) is split into full-viewport, scroll-snapped sections (CSS `scroll-snap-type`, scoped to the homepage via a `home-scroll-snap` class toggled on `<html>` in a `useEffect`):
+
+1. **Hero** (`HeroSection.tsx`) — intro and avatar.
+2. **Work Experience** (`WorkExperienceSection.tsx`) — expandable cards driven by `src/configs/workExperienceConfigs.ts`.
+3. **Latest posts** — post grid (`PostList.tsx`) + pagination, flowing normally past the viewport so the footer stays reachable.
+
+## Main Routes
+
+| Path | Description |
 |---|---|
-| `/` | 首頁，顯示最新文章列表（`POSTS_PER_PAGE = 6`）與履歷連結 |
-| `/page/[page]` | 文章分頁 |
-| `/posts/[slug]` | 文章內頁 |
-| `/resume` | 履歷頁（PDF 內嵌） |
-| `/api/subscribe` | Email 訂閱 API（使用 Resend） |
-
-## 開發指令
-
-```bash
-npm run dev         # 本機開發
-npm run build       # build + 產生 sitemap
-npm run lint        # ESLint 檢查
-npm run format:fix  # Prettier 格式化
-```
+| `/` | Homepage — hero, work experience, latest posts (`POSTS_PER_PAGE = 6`) |
+| `/page/[page]` | Paginated post list |
+| `/posts/[slug]` | Single post page |
+| `/resume` | Resume page (embedded PDF) |
+| `/api/subscribe` | Email subscribe API (via Resend) |
