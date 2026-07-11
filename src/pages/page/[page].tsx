@@ -68,9 +68,10 @@ export const getStaticProps: GetStaticProps = async (context) => {
     slug: post.slug,
     date: post.date,
     title: post.title,
-    description: post.description,
+    description: (locale === 'en' && post.descriptionEn) || post.description,
     path: post.path,
     image: post.image || '',
+    language: post.language,
   }));
   const totalPages = Math.ceil(allPostsNewToOld.length / POSTS_PER_PAGE);
   return {

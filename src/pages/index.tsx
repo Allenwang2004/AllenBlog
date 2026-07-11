@@ -15,6 +15,7 @@ import {
 import { useCommandPalettePostActions } from '@/components/CommandPalette/useCommandPalettePostActions';
 import LayoutPerPage from '@/components/LayoutPerPage';
 import PostList, { PostForPostList } from '@/components/PostList';
+import WorkExperienceSection from '@/components/WorkExperienceSection';
 import { siteConfigs } from '@/configs/siteConfigs';
 import { allPostsNewToOld } from '@/lib/contentLayerAdapter';
 import generateRSS from '@/lib/generateRSS';
@@ -51,9 +52,10 @@ export const getStaticProps: GetStaticProps<Props> = async (context) => {
     slug: post.slug,
     date: post.date,
     title: post.title,
-    description: post.description,
+    description: (locale === 'en' && post.descriptionEn) || post.description,
     path: post.path,
     image: post.image || '', // add image field for PostList
+    language: post.language,
   })) as PostForIndexPage[];
 
   generateRSS();
@@ -76,49 +78,44 @@ const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  useEffect(() => {
+    document.documentElement.classList.add('home-scroll-snap');
+    return () => document.documentElement.classList.remove('home-scroll-snap');
+  }, []);
+
   useCommandPalettePostActions(commandPalettePosts);
 
   // 只顯示前 9 篇
   const pagedPosts = posts.slice(0, POSTS_PER_PAGE);
 
   return (
-    <LayoutPerPage>      
+    <LayoutPerPage>
       {mounted && theme === 'dark' && <RippleBackground />}
       {mounted && theme !== 'dark' && <RippleBackground2 />}
-      <HeroSection />
-      {/* Main Content */}
-      <div style={{ position: 'relative', zIndex: 10 }}>
-        {/* Personal Avatar and Introduction */}
-        {/* <div className="flex flex-col items-center justify-center my-8">
-          <img
-            src="/photo.jpg"
-            alt="Allen's Avatar"
-            className="w-28 h-28 rounded-full shadow-lg border-4 border-white dark:border-gray-800 object-cover mb-4"
-          />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Tzu-Yi Wang</h1>
-          <p className="text-gray-600 dark:text-gray-300 text-center max-w-xl">
-            Hi, I'm Allen! I'm a passionate developer, focusing on Web3, AI, and trading systems. Welcome to my blog where I share my projects, insights, and tutorials on technology, and more.
-          </p>
-        </div> */}
-        {/* End Personal Avatar and Introduction */}
 
-        <ArticleJsonLd
-          type="Blog"
-          url={siteConfigs.fqdn}
-          title={siteConfigs.title}
-          images={[siteConfigs.bannerUrl]}
-          datePublished={siteConfigs.datePublished}
-          authorName={siteConfigs.author}
-          description={siteConfigs.description}
-        />
+      <ArticleJsonLd
+        type="Blog"
+        url={siteConfigs.fqdn}
+        title={siteConfigs.title}
+        images={[siteConfigs.bannerUrl]}
+        datePublished={siteConfigs.datePublished}
+        authorName={siteConfigs.author}
+        description={siteConfigs.description}
+      />
 
-        {/* <div className="prose my-12 space-y-2 transition-colors dark:prose-dark md:prose-lg md:space-y-5">
-          <h1 className="text-center sm:text-left">{t('intro-title')}</h1>
-          <p>{t('intro-1')}</p>
-          <p>{t('intro-2')}</p>
-          <p>{t('intro-3')}</p>
-        </div> */}
+      {/* Screen 1: Intro */}
+      <section className="snap-section">
+        <HeroSection />
+      </section>
 
+      {/* Screen 2: Work experience */}
+      <section className="snap-section flex min-h-screen flex-col justify-center py-10">
+        <WorkExperienceSection />
+      </section>
+
+      {/* Screen 3: Latest posts — snaps into view, then scrolls normally so the
+          full grid, pagination, and footer below it stay reachable. */}
+      <section className="snap-section flex min-h-screen flex-col py-10">
         <div className="my-4 divide-y divide-gray-200 transition-colors dark:divide-gray-700">
           <div className="prose prose-lg my-8 dark:prose-dark">
             <h2>{t('latest-posts')}</h2>
@@ -137,15 +134,15 @@ const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
             </a>
           </div>
         )}
-        <div className="prose prose-lg my-16 mx-auto text-center dark:prose-dark max-w-3xl">
+        {/* <div className="prose prose-lg my-16 mx-auto text-center dark:prose-dark max-w-3xl">
           <a
             href="/resume"
             className="inline-block mt-4 px-6 py-3 font-medium rounded text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800 transition"
           >
             Experience
           </a>
-        </div>
-      </div>
+        </div> */}
+      </section>
       {/*<EmailSubscribeForm />*/}
     </LayoutPerPage>
   );

@@ -19,6 +19,7 @@ import {
   KBarResults,
   Priority,
   useMatches,
+  useRegisterActions,
 } from 'kbar';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'next-i18next';
@@ -32,77 +33,112 @@ type Props = {
 };
 
 export default function CommandPalette({ children }: Props) {
-  const { t } = useTranslation(['common']);
-  const router = useRouter();
-  const { setTheme } = useTheme();
-
-  const actions = [
-    // Page section
-    {
-      id: 'home',
-      name: t('home'),
-      keywords: 'home homepage index 首頁',
-      perform: () => router.push('/'),
-      icon: <HomeIcon className="h-6 w-6" />,
-      section: {
-        name: t('page'),
-        priority: Priority.HIGH,
-      },
-    },
-    // Search section
-    // - Search posts
-    {
-      id: 'search-posts',
-      name: t('posts'),
-      keywords:
-        'search find posts writing words blog articles thoughts 搜尋 尋找 文章 寫作 部落格',
-      icon: <MagnifyingGlassIcon className="h-6 w-6" />,
-      section: t('search'),
-    },
-    // Operation section
-    // - Theme toggle
-    {
-      id: 'theme',
-      name: t('toggle-theme'),
-      keywords: 'change toggle theme mode color 切換 更換 顏色 主題 模式',
-      icon: <LightBulbIcon className="h-6 w-6" />,
-      section: t('operation'),
-    },
-    {
-      id: 'theme-light',
-      name: t('light-mode'),
-      keywords: 'theme light white mode color 顏色 主題 模式 明亮 白色',
-      perform: () => setTheme('light'),
-      icon: <SunIcon className="h-6 w-6" />,
-      parent: 'theme',
-      section: t('operation'),
-    },
-    {
-      id: 'theme-dark',
-      name: t('dark-mode'),
-      keywords: 'theme dark black mode color 顏色 主題 模式 暗黑 黑色 深夜',
-      perform: () => setTheme('dark'),
-      icon: <MoonIcon className="h-6 w-6" />,
-      parent: 'theme',
-      section: t('operation'),
-    },
-    // - Language toggle
-    {
-      id: 'language',
-      name: t('toggle-language'),
-      keywords:
-        'change toggle locale language translation 切換 更換 語言 語系 翻譯',
-      icon: <LanguageIcon className="h-6 w-6" />,
-      section: t('operation'),
-    },
-  ];
-
   return (
-    <KBarProvider actions={actions}>
+    <KBarProvider actions={[]}>
+      <StaticActions />
       <CommandBar />
       {children}
     </KBarProvider>
   );
+}
+
+// KBarProvider only reads its `actions` prop once, on mount, so static
+// actions must be registered here (inside the provider) via
+// useRegisterActions to stay in sync when the locale changes.
+function StaticActions() {
+  const { t } = useTranslation(['common']);
+  const router = useRouter();
+  const { pathname, asPath, query } = router;
+  const { setTheme } = useTheme();
+
+  const changeLocale = (locale: string) => {
+    router.push({ pathname, query }, asPath, { locale });
+  };
+
+  useRegisterActions(
+    [
+      // Page section
+      {
+        id: 'home',
+        name: t('home'),
+        keywords: 'home homepage index 首頁',
+        perform: () => router.push('/'),
+        icon: <HomeIcon className="h-6 w-6" />,
+        section: {
+          name: t('page'),
+          priority: Priority.HIGH,
+        },
+      },
+      // Search section
+      // - Search posts
+      {
+        id: 'search-posts',
+        name: t('posts'),
+        keywords:
+          'search find posts writing words blog articles thoughts 搜尋 尋找 文章 寫作 部落格',
+        icon: <MagnifyingGlassIcon className="h-6 w-6" />,
+        section: t('search'),
+      },
+      // Operation section
+      // - Theme toggle
+      {
+        id: 'theme',
+        name: t('toggle-theme'),
+        keywords: 'change toggle theme mode color 切換 更換 顏色 主題 模式',
+        icon: <LightBulbIcon className="h-6 w-6" />,
+        section: t('operation'),
+      },
+      {
+        id: 'theme-light',
+        name: t('light-mode'),
+        keywords: 'theme light white mode color 顏色 主題 模式 明亮 白色',
+        perform: () => setTheme('light'),
+        icon: <SunIcon className="h-6 w-6" />,
+        parent: 'theme',
+        section: t('operation'),
+      },
+      {
+        id: 'theme-dark',
+        name: t('dark-mode'),
+        keywords: 'theme dark black mode color 顏色 主題 模式 暗黑 黑色 深夜',
+        perform: () => setTheme('dark'),
+        icon: <MoonIcon className="h-6 w-6" />,
+        parent: 'theme',
+        section: t('operation'),
+      },
+      // - Language toggle
+      {
+        id: 'language',
+        name: t('toggle-language'),
+        keywords:
+          'change toggle locale language translation 切換 更換 語言 語系 翻譯',
+        icon: <LanguageIcon className="h-6 w-6" />,
+        section: t('operation'),
+      },
+      {
+        id: 'language-english',
+        name: 'English',
+        keywords: 'locale language translation english 語言 語系 英文 英語',
+        perform: () => changeLocale('en'),
+        icon: <span className="p-1">🇺🇸</span>,
+        parent: 'language',
+        section: t('operation'),
+      },
+      {
+        id: 'language-chinese',
+        name: '中文',
+        keywords:
+          'locale language translation traditional chinese taiwanese 語言 語系 翻譯 中文 台灣 繁體',
+        perform: () => changeLocale('zh-TW'),
+        icon: <span className="p-1">🇹🇼</span>,
+        parent: 'language',
+        section: t('operation'),
+      },
+    ],
+    [t, router.locale, asPath]
+  );
+
+  return null;
 }
 
 function CommandBar() {

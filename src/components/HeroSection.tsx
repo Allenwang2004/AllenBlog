@@ -17,15 +17,15 @@ export default function HeroSection() {
 
           <h2 className="text-2xl md:text-3xl text-gray-700 dark:text-gray-300 font-semibold">
             <TypeAnimation
-              sequence={["Developer", 2000, "Quant", 2000, "Open Source Builder", 2000]}
+              sequence={["Developer", 2000, "Quant Trader", 2000]}
               speed={50}
               repeat={Number.POSITIVE_INFINITY}
             />
           </h2>
 
           <p className="text-lg text-gray-600 dark:text-gray-400 max-w-xl">
-            I build high-performance trading systems, data pipelines, and web applications. Passionate about code,
-            markets, and emerging tech.
+            I build Agentic AI systems, automation pipelines, and web applications. Passionate about code,
+            markets, and emerging tech. Currently working in robotics field.
           </p>
 
           {/* <div className="pt-4">

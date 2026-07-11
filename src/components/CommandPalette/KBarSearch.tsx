@@ -58,7 +58,15 @@ export function KBarSearch(
       ref={ownRef}
       // eslint-disable-next-line jsx-a11y/no-autofocus
       autoFocus
+      type="text"
+      name="kbar-search"
       autoComplete="off"
+      // Hints for password managers to leave this field alone —
+      // they otherwise mistake the command palette input for a login field.
+      data-1p-ignore
+      data-lpignore="true"
+      data-bwignore="true"
+      data-form-type="other"
       role="combobox"
       spellCheck="false"
       aria-expanded={showing}

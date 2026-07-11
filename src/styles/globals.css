@@ -1,3 +1,14 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Full-screen section snapping on the homepage only (toggled via a class on
+   <html> in src/pages/index.tsx). scroll-snap-type must live on the actual
+   scrolling element, which for a normal document-flow page is <html>. */
+html.home-scroll-snap {
+  scroll-snap-type: y proximity;
+}
+
+.snap-section {
+  scroll-snap-align: start;
+}
