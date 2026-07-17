@@ -44,7 +44,7 @@ export default function HeroSection() {
             <img
               src="/photo.jpg"
               alt="Avatar"
-              className="relative z-10 w-64 h-64 lg:w-72 lg:h-72 rounded-full border-4 border-white dark:border-gray-800 object-cover shadow-xl hover:scale-105 transition-transform duration-500"
+              className="relative z-10 w-64 h-64 lg:w-72 lg:h-72 rounded-full border-4 border-white dark:border-gray-800 object-cover object-top shadow-xl hover:scale-105 transition-transform duration-500"
             />
           </div>
         </div>
