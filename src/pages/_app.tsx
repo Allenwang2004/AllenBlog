@@ -3,6 +3,7 @@ import '@/styles/prism-dracula.css';
 import '@/styles/prism-plus.css';
 import 'nprogress/nprogress.css';
 import '@/styles/nprogress-custom.scss';
+import 'katex/dist/katex.min.css';
 
 import type { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
