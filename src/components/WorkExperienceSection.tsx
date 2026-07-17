@@ -41,11 +41,27 @@ const WorkExperienceSection = () => {
                     : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'
                 }`}
               >
-                <span
-                  className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-md ring-1 ring-black/5 transition-transform duration-200 group-hover:scale-105 ${exp.color}`}
-                >
-                  {exp.logo}
-                </span>
+                <div className="h-28 w-40 shrink-0 flex items-center justify-center">
+                  {exp.image ? (
+                    <img
+                      src={exp.image}
+                      alt={exp.company}
+                      className={`rounded-2xl shadow-md ring-1 ring-black/5 transition-transform duration-200 group-hover:scale-105 ${
+                        exp.id === 'tymphany' || exp.id === 'aift'
+                          ? 'h-28 w-40 object-contain'
+                          : 'h-28 w-28 object-cover'
+                      }`}
+                    />
+                  ) : (
+                    <span
+                      className={`flex h-28 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-md ring-1 ring-black/5 transition-transform duration-200 group-hover:scale-105 ${
+                        exp.id === 'tymphany' || exp.id === 'aift' ? 'w-40' : 'w-28'
+                      } ${exp.color}`}
+                    >
+                      {exp.logo}
+                    </span>
+                  )}
+                </div>
 
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1">

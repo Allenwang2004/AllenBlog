@@ -9,15 +9,32 @@ export type WorkExperience = {
   color: string;
   summary: string;
   bullets: string[];
+  image?: string;
 };
 
 export const workExperiences: WorkExperience[] = [
   {
+    id: 'academia',
+    company: 'Academia Sinica',
+    role: 'Research Assistant',
+    period: 'July 2026 – Now',
+    current: true,
+    location: 'Taipei, Taiwan',
+    logo: 'AS',
+    color: 'bg-gradient-to-br from-gray-800 to-gray-950',
+    summary:
+      'Optimizing the FlowAI agentic framework and RAG-based planning system for audio processing workflows.',
+    bullets: [
+      'Working on...',
+    ],
+    image: '/images/workexperience/academia.png',
+  },
+  {
     id: 'tymphany',
     company: 'Tymphany',
     role: 'AI Assistant Engineer',
-    period: 'Feb 2026 – Now',
-    current: true,
+    period: 'Feb 2026 – June 2026',
+    current: false,
     location: 'Taipei, Taiwan',
     logo: 'TY',
     color: 'bg-gradient-to-br from-gray-800 to-gray-950',
@@ -28,6 +45,7 @@ export const workExperiences: WorkExperience[] = [
       'Fine-tuned large language models to generate structured audio processing pipelines, enabling automated workflow generation within the Flowstudio platform.',
       'Built automated CI/CD pipelines for continuous evaluation and benchmarking of agent planning performance and the deployment of the agentic infrastructure.',
     ],
+    image: '/images/workexperience/tymphany.jpg',
   },
   {
     id: 'aift',
@@ -44,6 +62,7 @@ export const workExperiences: WorkExperience[] = [
       'Built automated n8n workflows with LLM for smart contract vulnerability checks, integrating static analysis tools and alerting pipelines to ensure system security.',
       'Conducted research and produced analytical reports on various Web3 projects, including protocol architecture, tokenomics, security considerations, and potential use cases.',
     ],
+    image: '/images/workexperience/aift.avif',
   },
   {
     id: 'yuanta',
@@ -59,6 +78,7 @@ export const workExperiences: WorkExperience[] = [
       'Applied a wide range of machine learning and deep learning models to predict asset returns. Successfully reduced computation time and improved accuracy through linear models, and further enhanced predictive performance using GNU-based neural network implementations.',
       'Developed an intraday high-frequency trading strategy based on order flow imbalance and liquidity dynamics, achieving benchmark outperformance on GC futures in backtesting.',
     ],
+    image: '/images/workexperience/yuanta.jpg',
   },
   {
     id: 'medina',
@@ -74,5 +94,6 @@ export const workExperiences: WorkExperience[] = [
       'Engineered and selected alpha signals based on financial datasets; optimized factor combinations using feature engineering.',
       'Conducted event-driven abnormal return studies on public equities.',
     ],
+    image: '/images/workexperience/medina.jpeg',
   },
 ];
