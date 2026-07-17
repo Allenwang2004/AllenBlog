@@ -1,5 +1,4 @@
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
-import { AnimatePresence, motion } from 'framer-motion';
 import { useState } from 'react';
 
 import { workExperiences } from '@/configs/workExperienceConfigs';
@@ -9,6 +8,19 @@ const WorkExperienceSection = () => {
 
   return (
     <div className="my-10">
+      <style>{`
+        .work-exp-content {
+          max-height: 0;
+          opacity: 0;
+          overflow: hidden;
+          transition: max-height 0.25s ease-in-out, opacity 0.25s ease-in-out;
+        }
+        .work-exp-content.open {
+          max-height: 1000px;
+          opacity: 1;
+        }
+      `}</style>
+
       <div className="prose prose-lg dark:prose-dark">
         <h2>Work Experience</h2>
       </div>
@@ -67,37 +79,28 @@ const WorkExperienceSection = () => {
                 />
               </button>
 
-              <AnimatePresence initial={false}>
-                {isOpen && (
-                  <motion.div
-                    key="content"
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.25, ease: 'easeInOut' }}
-                    className="overflow-hidden bg-gray-50 dark:bg-gray-800/60"
-                  >
-                    <div className="px-5 pb-6 pt-1 sm:px-7">
-                      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-400 sm:hidden">
-                        {exp.period}
-                      </p>
-                      <p className="mb-4 text-sm text-gray-400">
-                        {exp.location}
-                      </p>
-                      <ul className="space-y-3 border-l-2 border-primary-200 pl-4 dark:border-primary-900">
-                        {exp.bullets.map((bullet) => (
-                          <li
-                            key={bullet}
-                            className="text-sm leading-relaxed text-gray-600 dark:text-gray-300"
-                          >
-                            {bullet}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <div
+                className={`work-exp-content ${isOpen ? 'open' : ''} bg-gray-50 dark:bg-gray-800/60`}
+              >
+                <div className="px-5 pb-6 pt-1 sm:px-7">
+                  <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-400 sm:hidden">
+                    {exp.period}
+                  </p>
+                  <p className="mb-4 text-sm text-gray-400">
+                    {exp.location}
+                  </p>
+                  <ul className="space-y-3 border-l-2 border-primary-200 pl-4 dark:border-primary-900">
+                    {exp.bullets.map((bullet) => (
+                      <li
+                        key={bullet}
+                        className="text-sm leading-relaxed text-gray-600 dark:text-gray-300"
+                      >
+                        {bullet}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
             </div>
           );
         })}
