@@ -46,10 +46,14 @@ const WorkExperienceSection = () => {
                     <img
                       src={exp.image}
                       alt={exp.company}
-                      className={`rounded-2xl shadow-md ring-1 ring-black/5 transition-transform duration-200 group-hover:scale-105 ${
-                        exp.id === 'tymphany' || exp.id === 'aift'
-                          ? 'h-28 w-40 object-contain'
-                          : 'h-28 w-28 object-cover'
+                      className={`shadow-md ring-1 ring-black/5 transition-transform duration-200 group-hover:scale-105 ${
+                        exp.id === 'tymphany'
+                          ? 'h-22 w-33 object-contain rounded-2xl'
+                          : exp.id === 'aift'
+                            ? 'h-20 w-30 object-contain rounded-2xl'
+                            : exp.id === 'academia'
+                              ? 'h-28 w-28 object-cover rounded-full'
+                              : 'h-28 w-28 object-cover rounded-2xl'
                       }`}
                     />
                   ) : (

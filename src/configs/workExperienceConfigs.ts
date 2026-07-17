@@ -23,7 +23,7 @@ export const workExperiences: WorkExperience[] = [
     logo: 'AS',
     color: 'bg-gradient-to-br from-gray-800 to-gray-950',
     summary:
-      'Optimizing the FlowAI agentic framework and RAG-based planning system for audio processing workflows.',
+      'Working on...',
     bullets: [
       'Working on...',
     ],

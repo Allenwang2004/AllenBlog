@@ -1,4 +1,5 @@
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { GetStaticPaths, GetStaticProps, NextPage } from 'next';
 import { useTheme } from 'next-themes';
 import { useTranslation } from 'next-i18next';
@@ -36,15 +37,23 @@ const Page: NextPage<Props> = ({ posts, page, totalPages }) => {
         <PostList posts={posts} />
       </div>
       {/* 分頁按鈕 */}
-      <div className="flex justify-center my-8 gap-2">
+      <div className="flex justify-center items-center my-12 gap-3">
         {Array.from({ length: totalPages }).map((_, idx) => (
-          <a
+          <Link
             key={idx}
             href={idx === 0 ? '/' : `/page/${idx + 1}`}
-            className={`px-4 py-2 rounded border font-medium transition ${page === idx + 1 ? 'bg-primary-500 text-white' : 'text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+            scroll={false}
           >
-            {idx + 1}
-          </a>
+            <a
+              className={`inline-flex items-center justify-center min-w-10 h-10 rounded-full font-bold text-base transition-all duration-300 transform ${
+                page === idx + 1
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 scale-105 ring-2 ring-blue-500/30 dark:ring-blue-600/40'
+                  : 'text-gray-600 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 hover:bg-blue-600 hover:text-white hover:scale-105 hover:shadow-md dark:hover:bg-blue-600'
+              }`}
+            >
+              {idx + 1}
+            </a>
+          </Link>
         ))}
       </div>
     </LayoutPerPage>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import dynamic from 'next/dynamic';
 import type { NextPage } from 'next';
@@ -85,8 +86,9 @@ const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
 
   useCommandPalettePostActions(commandPalettePosts);
 
-  // 只顯示前 9 篇
+  // 只顯示前 6 篇
   const pagedPosts = posts.slice(0, POSTS_PER_PAGE);
+  const totalPages = Math.ceil(posts.length / POSTS_PER_PAGE);
 
   return (
     <LayoutPerPage>
@@ -123,15 +125,26 @@ const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
 
           <PostList posts={pagedPosts} />
         </div>
-        {/* 分頁連結 */}
+        {/* 分頁按鈕 */}
         {posts.length > POSTS_PER_PAGE && (
-          <div className="flex justify-center my-8">
-            <a
-              href="/page/2"
-              className="px-6 py-3 font-medium rounded text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800 transition border border-gray-300 dark:border-gray-700"
-            >
-              Next Page →
-            </a>
+          <div className="flex justify-center items-center my-12 gap-3">
+            {Array.from({ length: totalPages }).map((_, idx) => (
+              <Link
+                key={idx}
+                href={idx === 0 ? '/' : `/page/${idx + 1}`}
+                scroll={false}
+              >
+                <a
+                  className={`inline-flex items-center justify-center min-w-10 h-10 rounded-full font-bold text-base transition-all duration-300 transform ${
+                    idx === 0
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 scale-105 ring-2 ring-blue-500/30 dark:ring-blue-600/40'
+                      : 'text-gray-600 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 hover:bg-blue-600 hover:text-white hover:scale-105 hover:shadow-md dark:hover:bg-blue-600'
+                  }`}
+                >
+                  {idx + 1}
+                </a>
+              </Link>
+            ))}
           </div>
         )}
         {/* <div className="prose prose-lg my-16 mx-auto text-center dark:prose-dark max-w-3xl">
