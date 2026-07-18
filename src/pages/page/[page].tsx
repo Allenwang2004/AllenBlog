@@ -47,8 +47,8 @@ const Page: NextPage<Props> = ({ posts, page, totalPages }) => {
             <a
               className={`inline-flex items-center justify-center min-w-10 h-10 rounded-full font-bold text-base transition-all duration-300 transform ${
                 page === idx + 1
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 scale-105 ring-2 ring-blue-500/30 dark:ring-blue-600/40'
-                  : 'text-gray-600 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 hover:bg-blue-600 hover:text-white hover:scale-105 hover:shadow-md dark:hover:bg-blue-600'
+                  ? 'bg-black text-white shadow-lg shadow-black/20 scale-105 ring-2 ring-gray-600/30 dark:ring-gray-700/40'
+                  : 'text-gray-600 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 hover:bg-black hover:text-white hover:scale-105 hover:shadow-md dark:hover:bg-black'
               }`}
             >
               {idx + 1}
