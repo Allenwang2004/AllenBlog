@@ -1,0 +1,281 @@
+---
+title: Probability & Statistic in Machine Learning(III)
+description: Sampling and Point estimation
+descriptionEn: Sampling and Point estimation
+slug: probability-&-statistic-in-machine-learning(iii)-post
+date: 2026-07-22
+type: Post
+image: /images/probability_theory.png
+language: en
+---
+
+# Sampling and Point Estimation
+
+### Population and Sample
+
+**Population** is the entire group we actually care about — for example, every score every student in the world could ever produce on a given test. **Sample** is the subset we actually get to observe — for example, the 30 scores from this year's midterm in one classroom. We never get to see the population directly; we only see a sample of it, and we use statistics computed from that sample (like the sample mean) to *estimate* properties of the population (like the true population mean) that we can never directly measure.
+
+Key idea: every dataset we work with in machine learning is a sample, not the population. We are always trying to infer properties of the true underlying data-generating process (the population) from a finite dataset (the sample).
+
+- **Sample Mean** — estimates the population mean $\mu$
+- **Sample Proportion** — estimates a population proportion $p$
+- **Sample Variance** — estimates the population variance $\sigma^2$, but needs a small correction to be unbiased
+
+    **Why does the sample variance divide by $n-1$ instead of $n$?**
+
+    The population variance is defined using the *true* population mean $\mu$:
+
+    $$
+    \sigma^2 = \frac{1}{N}\sum_{i=1}^{N}(x_i - \mu)^2
+    $$
+
+    But with only a sample, we don't know $\mu$ — we can only use the sample mean $\bar{x}$ instead. This substitution is exactly where the bias comes from: $\bar{x}$ is computed from the same data it's being compared against, so it always sits a little closer to the sample points than the true $\mu$ would, making the sum of squared deviations come out slightly too small.
+
+    **Concrete example.** Suppose the population has $N=4$ values: $\{2, 4, 6, 8\}$.
+
+    Population mean: $\mu = 5$. Population variance: $\sigma^2 = \dfrac{(2-5)^2+(4-5)^2+(6-5)^2+(8-5)^2}{4} = \dfrac{20}{4} = 5$.
+
+    Now draw a sample of $n=2$ values (with replacement) and compute the variance two ways. For two points $a, b$, the sum of squared deviations from the sample mean conveniently simplifies to $\frac{(a-b)^2}{2}$:
+
+    | Sample $(a,b)$ | Sample mean | $\sum(x_i-\bar{x})^2$ | Divide by $n=2$ | Divide by $n-1=1$ |
+    |---|---|---|---|---|
+    | $(2,4)$ | 3 | 2 | 1.0 | 2.0 |
+    | $(2,8)$ | 5 | 18 | 9.0 | 18.0 |
+    | $(4,8)$ | 6 | 8 | 4.0 | 8.0 |
+    | $(6,8)$ | 7 | 2 | 1.0 | 2.0 |
+
+    Any single sample is a noisy estimate either way. But average the estimate over *all 16* equally likely ordered pairs you could draw (with replacement) from this population:
+
+    $$
+    E\left[\frac{\sum(x_i-\bar{x})^2}{n-1}\right] = \sigma^2 = 5 \qquad\qquad E\left[\frac{\sum(x_i-\bar{x})^2}{n}\right] = \frac{n-1}{n}\sigma^2 = \frac{1}{2}(5) = 2.5
+    $$
+
+    Dividing by $n-1$ recovers the true population variance exactly, on average. Dividing by $n$ systematically underestimates it — which is exactly why the sample variance formula uses $n-1$, a correction known as **Bessel's correction**:
+
+    $$
+    \text{Population variance: } \sigma^2 = \frac{1}{N}\sum_{i=1}^{N}(x_i-\mu)^2 \qquad\qquad \text{Sample variance: } s^2 = \frac{1}{n-1}\sum_{i=1}^{n}(x_i-\bar{x})^2
+    $$
+
+### Law of Large Numbers
+
+The **Law of Large Numbers (LLN)** says that as we collect more samples, the sample mean converges to the true population mean:
+
+$$
+\bar{X}_n = \frac{1}{n}\sum_{i=1}^n X_i \xrightarrow{\ n \to \infty\ } \mu
+$$
+
+Intuitively: any individual sample is noisy, but that noise averages out as $n$ grows. This is exactly why "more data" tends to make machine learning estimates more reliable — a model trained on a larger sample sees a mean/behavior that's closer to the true population behavior.
+
+### CLT
+
+The **Central Limit Theorem (CLT)** goes a step further: regardless of the shape of the population distribution, the sample mean $\bar{X}_n$ becomes approximately normally distributed as $n$ grows large:
+
+$$
+\bar{X}_n \approx \mathcal{N}\left(\mu, \frac{\sigma^2}{n}\right) \qquad \text{equivalently} \qquad \frac{\bar{X}_n - \mu}{\sigma/\sqrt{n}} \xrightarrow{\ n \to \infty\ } \mathcal{N}(0,1)
+$$
+
+This is what lets us build confidence intervals and hypothesis tests around a sample mean even when we don't know the true shape of the population distribution — we only need its mean $\mu$ and variance $\sigma^2$ to exist.
+
+### Point Estimations
+
+A point estimate is a single numerical value based on sample data that is used to approximate an unknown parameter of a population or model.
+
+### MLE (Maximum Likelihood Estimation)
+
+**Likelihood**: $P(B \mid A)$ — given the prior/condition $A$, what is the probability of observing event $B$?
+
+So MLE is trying to find the parameter value under which the probability of observing the event we actually saw is maximized.
+
+![Screenshot 2026-07-14 at 10.40.40 PM.png](/images/probability-&-statistic-in-machine-learning(iii)/Screenshot_2026-07-14_at_10.40.40_PM.png)
+
+The blue curve above is the likelihood: for every possible value of the parameter $\theta$ (the x-axis), it shows how likely it is — computed directly from the formula — that this parameter would have produced the orange sampled data shown below. Notice the curve peaks near $\theta \approx 0$, which lines up almost exactly with where the sampled data actually came from.
+
+**The core idea behind the likelihood function** is: **"Given the data we've already observed, if we assume the population parameter is $\theta$, how likely (in terms of probability density) is it that this exact data would occur together?"**
+
+---
+
+### 1. Probability Density of a Single Data Point
+
+Suppose we draw a single data point $x_1$. If we guess that this data comes from a normal distribution with mean $\mu$ and standard deviation $\sigma$, then the probability density of this point occurring (the height of the curve at that point) is:
+
+$$
+f(x_1 \vert{} \mu, \sigma) = \frac{1}{\sigma \sqrt{2\pi}} \exp\left( -\frac{(x_1 - \mu)^2}{2\sigma^2} \right)
+$$
+
+---
+
+### 2. The Joint Probability of Multiple Independent Points (the Likelihood Itself)
+
+In practice we usually draw many points (for example, $n = 660$ points in the figure above). Because each draw is an **independent event**, the total probability of drawing all $n$ points together is simply the product of each point's probability density.
+
+This gives us the likelihood function $L(\mu, \sigma)$:
+
+$$
+L(\mu, \sigma) = f(x_1 \vert{} \mu, \sigma) \times f(x_2 \vert{} \mu, \sigma) \times \dots \times f(x_n \vert{} \mu, \sigma)
+$$
+
+Written with the product notation $\prod$:
+
+$$
+L(\mu, \sigma) = \prod_{i=1}^{n} \frac{1}{\sigma \sqrt{2\pi}} \exp\left( -\frac{(x_i - \mu)^2}{2\sigma^2} \right)
+$$
+
+---
+
+### 3. Computing It in Practice: Taking the Log (Log-Likelihood)
+
+You've probably noticed the problem: multiplying hundreds of probability values that are each less than 1 makes the product shrink to an astronomically small number (e.g., $10^{-300}$), which easily causes numerical underflow on a computer. On top of that, a product of many terms is awkward to differentiate when we want to find its maximum.
+
+To fix this, statisticians take the **natural log ($\ln$ or $\log$)** of both sides, since logarithms turn multiplication into addition:
+
+$$
+\log L(\mu, \sigma) = \sum_{i=1}^{n} \log \left[ \frac{1}{\sigma \sqrt{2\pi}} \exp\left( -\frac{(x_i - \mu)^2}{2\sigma^2} \right) \right]
+$$
+
+Expanding this using log rules, the log-likelihood of the normal distribution becomes:
+
+$$
+\log L(\mu, \sigma) = -\frac{n}{2}\log(2\pi) - n\log(\sigma) - \frac{1}{2\sigma^2}\sum_{i=1}^{n}(x_i - \mu)^2
+$$
+
+> **This is exactly the formula behind the blue parabola plotted in the middle panel of the demo above!**
+
+---
+
+### 4. A Worked Example
+
+Suppose we only have **3 data points**: $x = [1, 2, 3]$, and we know $\sigma = 1$. We want to test two different guesses for the mean ($\mu = 0$ and $\mu = 2$) and see which one gives a higher likelihood.
+
+- **Guess 1: $\mu = 0$**
+The sum of squared distances from each point to 0 is $(1-0)^2 + (2-0)^2 + (3-0)^2 = 1 + 4 + 9 = 14$. Plugging this into the formula, the value subtracted in the last term is $\frac{14}{2} = 7$.
+- **Guess 2: $\mu = 2$**
+The sum of squared distances from each point to 2 is $(1-2)^2 + (2-2)^2 + (3-2)^2 = 1 + 0 + 1 = 2$. Plugging this into the formula, the value subtracted in the last term is $\frac{2}{2} = 1$.
+
+Since the formula has a negative sign in front, subtracting less means the overall $\log L$ is larger!
+
+- The log-likelihood computed for $\mu = 2$ is much larger than for $\mu = 0$.
+- This matches intuition: since the data is clustered around 1, 2, 3, guessing the mean is 2 is clearly closer to reality than guessing 0.
+
+This is exactly how a computer finds the MLE in practice: it plugs in many different values of $\mu$ behind the scenes until it finds the $\hat{\mu}$ that maximizes this function (the peak of the parabola) — that's the computational process behind Maximum Likelihood Estimation (MLE).
+
+### MLE Regression
+
+First, take a look at the following picture — this is a 2-dimensional regression problem. For every $x$, we assume the corresponding $y$ is drawn from a Gaussian distribution centered on the regression line. In other words, the line doesn't predict $y$ exactly — it predicts the *mean* of a normal distribution that $y$ is sampled from, so we can calculate a probability for observing any particular $y$.
+
+![Screenshot 2026-07-14 at 10.48.26 PM.png](/images/probability-&-statistic-in-machine-learning(iii)/Screenshot_2026-07-14_at_10.48.26_PM.png)
+
+For a single point $(x_i, y_i)$, the probability of observing $y_i$ given the line's prediction $f(x_i) = wx_i + b$ is:
+
+$$
+P(y_i \mid x_i) = \frac{1}{\sigma\sqrt{2\pi}} \exp\left(-\frac{(y_i - (wx_i+b))^2}{2\sigma^2}\right)
+$$
+
+For all five points in the picture, assuming each is drawn independently, the joint probability is the product of each individual probability:
+
+$$
+P(y_1, \dots, y_5 \mid x_1, \dots, x_5) = \prod_{i=1}^{5} \frac{1}{\sigma\sqrt{2\pi}} \exp\left(-\frac{(y_i - (wx_i+b))^2}{2\sigma^2}\right)
+$$
+
+Viewed as a function of the line's parameters $w$ and $b$, this joint probability is exactly the likelihood:
+
+$$
+L(w, b) = \prod_{i=1}^{n} \frac{1}{\sigma\sqrt{2\pi}} \exp\left(-\frac{(y_i - (wx_i+b))^2}{2\sigma^2}\right)
+$$
+
+Just like before, take the log to turn the product into a sum:
+
+$$
+\log L(w, b) = -n\log\left(\sigma\sqrt{2\pi}\right) - \frac{1}{2\sigma^2}\sum_{i=1}^{n} (y_i - (wx_i+b))^2
+$$
+
+Now let's take off the constant — since $-n\log(\sigma\sqrt{2\pi})$ doesn't depend on $w$ or $b$ at all, maximizing $\log L(w,b)$ is the same as maximizing what's left:
+
+$$
+\arg\max_{w,b}\ \log L(w,b) \;=\; \arg\max_{w,b}\ \left[-\frac{1}{2\sigma^2}\sum_{i=1}^{n} (y_i - (wx_i+b))^2\right]
+$$
+
+And if we flip the sign and change the problem into a minimization (dropping the positive constant $\frac{1}{2\sigma^2}$, which doesn't change *where* the optimum is):
+
+$$
+\arg\max_{w,b}\ \log L(w,b) \;=\; \arg\min_{w,b}\ \sum_{i=1}^{n} (y_i - (wx_i+b))^2
+$$
+
+This is the least-squares error we already know! In other words, ordinary least-squares regression is exactly the MLE solution under the assumption that the noise around the line is Gaussian.
+
+Here comes a very interesting question, though: what does a probability actually *represent*? Two schools of thought answer this differently.
+
+### Frequentists v.s Bayesians
+
+Frequentists
+
+- Probabilities represent the long-run frequency of events
+- Built around the concept of likelihood
+- Goal: find the model that most likely generated the observed data
+
+Bayesians
+
+- Probabilities represent a degree of belief (or certainty)
+- Built around the concept of a prior
+- Goal: update prior beliefs based on new observations
+
+### Maximum Posteriori (MAP)
+
+![Screenshot 2026-07-15 at 11.11.18 AM.png](/images/probability-&-statistic-in-machine-learning(iii)/Screenshot_2026-07-15_at_11.11.18_AM.png)
+
+Bayes' rule connects the prior, the likelihood, and the posterior:
+
+$$
+P(A \mid B) = \frac{P(B \mid A)\,P(A)}{P(B)}
+$$
+
+Applying this to parameter estimation, the **posterior** is the probability of the parameter $\theta$ given the data we observed, and **Maximum a Posteriori (MAP)** estimation finds the value of $\theta$ that maximizes it:
+
+$$
+\hat{\theta}_{MAP} = \arg\max_{\theta}\ P(\theta \mid \text{data}) = \arg\max_{\theta}\ \frac{P(\text{data} \mid \theta)\,P(\theta)}{P(\text{data})} = \arg\max_{\theta}\ P(\text{data} \mid \theta)\,P(\theta)
+$$
+
+The only difference from MLE is the extra $P(\theta)$ term — the **prior** belief about $\theta$ before seeing any data. When the prior is flat (uniform, no preference for any value of $\theta$), MAP reduces exactly to MLE.
+
+### Regularization
+
+Consider what happens when we bring a prior into the regression problem above. Recall that MLE regression reduces to minimizing the sum of squared errors. If we now put a Gaussian prior on the weights $w$ — i.e., we believe *before* seeing any data that the weights should be small and centered around 0 — then MAP estimation adds a penalty term to that objective:
+
+$$
+\hat{w}_{MAP} = \arg\min_{w}\ \left[\sum_{i=1}^n (y_i - (wx_i+b))^2 + \lambda \sum_j w_j^2\right]
+$$
+
+This is exactly **L2 regularization (ridge regression)**: a Gaussian prior on the weights, expressed through Bayes' rule, becomes the familiar $\lambda \sum w_j^2$ penalty term. (A Laplace prior on the weights would instead give **L1 regularization / Lasso**.) This is the deep connection between regularization and Bayesian priors — regularizing a model is mathematically the same as encoding a prior belief about what the parameters should look like.
+
+**A discrete example of Bayesian updating**
+
+Let $Y$ be the "true" probability of heads for a coin:
+
+- $Y = 0.5$ if the coin is fair
+- $Y = 0.8$ if the coin is biased
+
+Our **prior** belief about which one we have, before flipping anything, is:
+
+$$
+P(Y=0.5) = 0.75 \qquad P(Y=0.8) = 0.25
+$$
+
+We flip the coin once and observe heads ($X = H$). We want the **posterior** $P(Y=0.5 \mid X=H)$ — our updated belief after seeing this evidence. By Bayes' rule:
+
+$$
+P(Y=0.5 \mid X=H) = \frac{P(X=H \mid Y=0.5)\,P(Y=0.5)}{P(X=H \mid Y=0.5)\,P(Y=0.5) + P(X=H \mid Y=0.8)\,P(Y=0.8)} = \frac{(0.5)(0.75)}{(0.5)(0.75) + (0.8)(0.25)} = \frac{0.375}{0.575} \approx 0.652
+$$
+
+So after a single head, our belief that the coin is fair drops from 75% to about 65.2% — and this posterior now becomes the new prior for the next flip.
+
+If we keep flipping and keep getting heads, the posterior keeps updating and converges toward the coin actually being biased (since a run of heads is far more consistent with $Y=0.8$ than $Y=0.5$):
+
+| Flips so far (all heads) | Posterior $P(Y=0.5 \mid \text{data})$ | Posterior $P(Y=0.8 \mid \text{data})$ |
+|---|---|---|
+| 0 (prior) | 0.750 | 0.250 |
+| 1 | 0.652 | 0.348 |
+| 2 | 0.540 | 0.460 |
+| 3 | 0.423 | 0.577 |
+| 4 | 0.314 | 0.686 |
+| 5 | 0.222 | 0.778 |
+
+As more evidence comes in, the belief that the coin is fair steadily shrinks toward 0, while the belief that it's biased grows toward 1. This convergence, driven purely by repeatedly applying Bayes' rule, is the core mechanic behind all Bayesian updating.
