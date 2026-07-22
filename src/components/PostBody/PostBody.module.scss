@@ -11,6 +11,10 @@
     @apply ml-auto mr-auto;
   }
 
+  :global(.math-display) {
+    @apply block overflow-x-auto text-center;
+  }
+
   blockquote {
     @apply not-italic;
 

@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3001)",
-      "Bash(pkill -f \"next dev\")"
+      "Bash(pkill -f \"next dev\")",
+      "Bash(xargs ls)",
+      "Bash(curl -s \"http://localhost:3000/posts/probability-i-post\")",
+      "Bash(grep -n \"^\\\\\\\\\\\\\\\\.*,\\\\s*$\\\\|, $\" \"/Users/coconut/AllenBlog/content/posts/probability\\(ii\\).mdx\")",
+      "Bash(curl -s \"http://localhost:3000/posts/\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(curl -s \"http://localhost:3000/posts/probability\\(i\\)-post\" -o /private/tmp/claude-501/-Users-coconut-AllenBlog/3284a1c1-af06-4e03-88bb-b81287c59264/scratchpad/prob1.html)",
+      "Bash(curl -s \"http://localhost:3000/posts/probability\\(i\\)-post\" -o /private/tmp/claude-501/-Users-coconut-AllenBlog/3284a1c1-af06-4e03-88bb-b81287c59264/scratchpad/prob1b.html -w \"%{http_code}\\\\n\")",
+      "Bash(printf '\\\\n\\\\nThis inverse-CDF approach works well when $F_X^{-1}$ is easy to evaluate, but it is not the only way to sample from a distribution. In a later post, we will cover more general sampling methods — such as importance sampling, rejection sampling, and MCMC — which are needed when the target distribution'\\\\''s CDF is hard to invert, or when we only know the PDF up to a normalizing constant.\\\\n')"
     ]
   }
 }
