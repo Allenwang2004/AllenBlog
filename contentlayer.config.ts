@@ -3,6 +3,7 @@ import rehypePrism from 'rehype-prism-plus';
 import rehypeSlug from 'rehype-slug';
 import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
 import { DEFAULT_LOCALE, LOCALES } from './src/configs/i18nConfigs';
 import { defineDocumentType, makeSource } from 'contentlayer/source-files'; // ✅ 改這裡！
 import imageMetadata from './src/plugins/imageMetadata';
@@ -42,7 +43,7 @@ export default makeSource({
   contentDirPath: 'content',
   documentTypes: [Post],
   mdx: {
-    remarkPlugins: [remarkMath],
+    remarkPlugins: [remarkMath, remarkGfm],
     rehypePlugins: [
       rehypeSlug,
       rehypeCodeTitles,
