@@ -121,6 +121,9 @@ const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
         <div className="my-4 divide-y divide-gray-200 transition-colors dark:divide-gray-700">
           <div className="prose prose-lg my-8 dark:prose-dark">
             <h2>{t('latest-posts')}</h2>
+            <p className="!mt-2 text-base text-gray-500 dark:text-gray-400">
+              {t('latest-posts-desc')}
+            </p>
           </div>
 
           <PostList posts={pagedPosts} />

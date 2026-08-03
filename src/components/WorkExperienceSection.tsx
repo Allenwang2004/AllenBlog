@@ -1,6 +1,7 @@
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 
+import CustomLink from '@/components/CustomLink';
 import { workExperiences } from '@/configs/workExperienceConfigs';
 
 const WorkExperienceSection = () => {
@@ -83,9 +84,6 @@ const WorkExperienceSection = () => {
                       </span>
                     )}
                   </span>
-                  <span className="mt-1 block truncate text-sm text-gray-500 dark:text-gray-400">
-                    {exp.summary}
-                  </span>
                 </span>
 
                 <span className="hidden shrink-0 whitespace-nowrap rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400 sm:inline-block">
@@ -119,6 +117,31 @@ const WorkExperienceSection = () => {
                       </li>
                     ))}
                   </ul>
+
+                  <CustomLink
+                    href={`/experience/${exp.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group mt-5 flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-3 transition-shadow hover:shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                  >
+                    <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
+                      {exp.image && (
+                        <img
+                          src={exp.image}
+                          alt={exp.company}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-900 group-hover:text-primary-500 dark:text-gray-100">
+                        View outcomes from this role
+                      </p>
+                      <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                        Working on...
+                      </p>
+                    </div>
+                  </CustomLink>
                 </div>
               </div>
             </div>

@@ -17,7 +17,11 @@ export const useCommandPalettePostActions = (
         id: post.slug,
         name: post.title,
         subtitle: post.description,
-        keywords: `${post.title} ${post.description || ''}`,
+        // kbar already searches `name` + `subtitle` for every action, so
+        // repeating the (often long) description here would duplicate it in
+        // the search haystack and — since kbar's fuzzy matcher is an
+        // unmemoized recursive subsequence search — roughly double the risk
+        // of pathological slowdowns on common multi-word queries.
         perform: () => router.push(post.path),
         section: t('search-posts'),
         parent: 'search-posts',

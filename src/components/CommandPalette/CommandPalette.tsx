@@ -157,8 +157,21 @@ function CommandBar() {
 function RenderResults() {
   const { results, rootActionId } = useMatches();
 
+  // kbar's internal list virtualizer (react-virtual) keys rows by index and
+  // only remeasures a row's height when its ref callback identity changes.
+  // If the result set changes but stays the same length, previously
+  // measured (and now stale) heights get reused for different items,
+  // which makes rows overlap once their content height actually differs
+  // (e.g. subtitles wrapping to a different number of lines). Remounting
+  // <KBarResults> whenever the actual set of matched ids changes forces a
+  // fresh measurement pass and avoids the stale-height overlap.
+  const resultsKey = results
+    .map((item) => (typeof item === 'string' ? item : item.id))
+    .join('|');
+
   return (
     <KBarResults
+      key={resultsKey}
       items={results}
       onRender={({ item, active }) =>
         typeof item === 'string' ? (
