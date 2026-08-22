@@ -1,0 +1,271 @@
+---
+title: Weights & Biases
+description: How to track your ML experiments with Weights & Biases — uploading logs, reading the dashboard, and the features worth knowing.
+descriptionEn: How to track your ML experiments with Weights & Biases — uploading logs, reading the dashboard, and the features worth knowing.
+slug: weights-&-biases-post
+date: 2026-08-23
+type: Post
+image: /images/w&b.png
+language: en
+---
+
+### Introduction
+
+If you have trained more than a couple of models, you know the failure mode: you tweak the learning rate, run the script, watch loss numbers scroll past in the terminal, and then a week later you cannot remember which combination of settings produced the one good result. Printed logs disappear when the terminal closes, and a folder of `run_final_v2_actually_final.pt` checkpoints tells you nothing about how each was trained.
+
+**Weights & Biases** (usually written **W&B**, and imported in Python as `wandb`) exists to solve exactly that. It is an experiment tracking platform: your training script sends metrics, hyperparameters, and files to a hosted service as the run happens, and you get a live web dashboard that plots everything, keeps it forever, and lets you compare runs side by side.
+
+The mental model is simple:
+
+1. A **run** is one execution of your training script.
+2. A **project** is a collection of runs you want to compare against each other.
+3. Your script *logs* numbers into the current run; W&B *uploads* them and draws the charts.
+
+You do not have to change how you train. In most cases you add three lines to an existing script and you are done. The rest of this post walks through those three lines, shows you where the results actually show up online, and then covers the features that make W&B worth keeping around once the novelty wears off.
+
+## Getting Started
+
+Install the client and log in:
+
+```bash
+pip install wandb
+wandb login
+```
+
+`wandb login` asks for an API key. Create a free account at [wandb.ai](https://wandb.ai), then copy the key from [wandb.ai/authorize](https://wandb.ai/authorize) and paste it into the prompt. The key is stored in `~/.netrc`, so this is a one-time step per machine.
+
+On a remote box or a CI runner where you cannot paste interactively, set it as an environment variable instead:
+
+```bash
+export WANDB_API_KEY=<your-api-key>
+```
+
+## Your First Run
+
+Here is the smallest script that produces something on the dashboard:
+
+```python
+import wandb
+import random
+
+# 1. Start a run. This creates the run on wandb.ai and returns a handle.
+wandb.init(
+    project="my-first-project",
+    name="baseline",                       # optional, human-readable run name
+    config={                               # your hyperparameters
+        "learning_rate": 1e-3,
+        "batch_size": 32,
+        "epochs": 10,
+    },
+)
+
+# 2. Log metrics as training progresses.
+for epoch in range(10):
+    loss = 2.0 / (epoch + 1) + random.random() * 0.1
+    acc = 1.0 - loss / 3
+    wandb.log({"epoch": epoch, "loss": loss, "accuracy": acc})
+
+# 3. Close the run so the last data is flushed and the run is marked finished.
+wandb.finish()
+```
+
+Those are the three calls that matter:
+
+- **`wandb.init()`** creates the run, uploads your `config` dictionary, and starts a background process that streams data to the server. Everything after this point belongs to that run.
+- **`wandb.log()`** takes a dictionary of `{"metric_name": value}` and records it at the current step. Call it as often as you like — once per epoch, once per batch, whatever granularity you want to see in the charts. Every distinct key becomes its own chart.
+- **`wandb.finish()`** flushes anything still buffered and marks the run as finished rather than crashed. In a notebook this matters a lot, because the process does not exit on its own.
+
+### Where the results show up
+
+When you run the script, W&B prints something like this to your terminal:
+
+```bash
+wandb: Currently logged in as: your-username
+wandb: Run data is saved locally in ./wandb/run-20260823_004512-a1b2c3d4
+wandb: Syncing run baseline
+wandb: 🚀 View run at https://wandb.ai/your-username/my-first-project/runs/a1b2c3d4
+```
+
+That last URL is the whole point — open it and you are looking at your run **while it is still training**. The page gives you:
+
+- **Charts** — one panel per logged metric, updating live as new points arrive. You can zoom, change the x-axis (step, epoch, or wall-clock time), and smooth noisy curves.
+- **Overview** — the config you passed to `wandb.init`, the git commit the run started from, the exact command line, and the Python environment. This is what lets you answer "what did I actually run?" three weeks later.
+- **System** — GPU utilization, GPU memory, CPU, and RAM over time, recorded automatically without you logging anything.
+- **Logs** — your stdout and stderr, captured and stored, so a crash on a remote machine is still readable after the SSH session dies.
+
+Going one level up to `wandb.ai/<your-username>/<project>` gives you the **project workspace**: a table of every run in the project, with all their metrics overlaid on shared charts. Tick two runs in the sidebar and their curves are drawn on the same axes — that side-by-side comparison is the single most useful thing the tool does.
+
+### A more realistic training loop
+
+In practice you log inside your existing loop and read hyperparameters back out of `wandb.config`, so that a sweep (below) can override them without you editing code:
+
+```python
+import wandb
+import torch
+
+run = wandb.init(project="mnist", config={"lr": 1e-3, "epochs": 5})
+config = run.config          # read hyperparameters from here, not from constants
+
+model = MyModel()
+optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
+
+# Track gradients and weight histograms for this model.
+wandb.watch(model, log="all", log_freq=100)
+
+for epoch in range(config.epochs):
+    model.train()
+    for step, (x, y) in enumerate(train_loader):
+        loss = criterion(model(x), y)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # Per-step training loss.
+        wandb.log({"train/loss": loss.item()})
+
+    val_loss, val_acc = evaluate(model, val_loader)
+    # Per-epoch validation metrics, tagged with the epoch.
+    wandb.log({"val/loss": val_loss, "val/acc": val_acc, "epoch": epoch})
+
+wandb.finish()
+```
+
+Two small conventions worth adopting early: prefix metric names with a section (`train/`, `val/`), which makes W&B group them into separate panels on the dashboard, and log validation metrics once per epoch rather than per step, so the curves stay readable.
+
+## Experiment Management
+
+Once runs are being tracked, the next problem is managing the *inputs and outputs* of those runs — not just the numbers they printed.
+
+### Artifacts — version control for datasets and checkpoints
+
+An **Artifact** is a versioned, named blob of files: a dataset, a preprocessed feature store, a model checkpoint. You log it from a run, and W&B records which run produced it and which runs consumed it. That lineage is what lets you answer "which dataset was this model trained on?" — and pull the exact historical version back out, rather than guessing from a filename.
+
+```python
+# Save a checkpoint as a versioned artifact.
+artifact = wandb.Artifact("mnist-cnn", type="model")
+artifact.add_file("checkpoint.pt")
+run.log_artifact(artifact)
+
+# Later — in a different script, or weeks later — pull a specific version back.
+artifact = run.use_artifact("mnist-cnn:v3")
+path = artifact.download()
+```
+
+Each `log_artifact` with changed contents creates a new version (`v0`, `v1`, `v2`, …), and identical contents are deduplicated rather than re-uploaded. You can also tag a version (`:latest`, `:best`) and refer to it by tag.
+
+### Sweeps — automated hyperparameter search
+
+A **Sweep** runs your training script many times with different hyperparameters and collects the results in one place. You describe the search space in YAML, and W&B's server hands out the next configuration to each worker:
+
+```python
+sweep_config = {
+    "method": "bayes",                          # or "grid" / "random"
+    "metric": {"name": "val/loss", "goal": "minimize"},
+    "parameters": {
+        "lr":         {"min": 1e-5, "max": 1e-2, "distribution": "log_uniform_values"},
+        "batch_size": {"values": [16, 32, 64, 128]},
+        "dropout":    {"min": 0.0, "max": 0.5},
+    },
+}
+
+sweep_id = wandb.sweep(sweep_config, project="mnist")
+wandb.agent(sweep_id, function=train, count=50)   # run 50 trials
+```
+
+The three search strategies differ in how they pick the next point:
+
+- **grid** — try every combination. Exhaustive and predictable, but the cost explodes with the number of parameters.
+- **random** — sample independently. Surprisingly strong, and it parallelizes perfectly across machines.
+- **bayes** — model the relationship between hyperparameters and the target metric, then sample where the model expects improvement. The most sample-efficient of the three, which matters when a single run takes hours.
+
+Because the agent pulls its next config from the server, you can start agents on several machines with the same `sweep_id` and they will cooperate on one search. The sweep page then draws a parallel-coordinates plot and a parameter-importance chart, which tell you not just which run won but *which hyperparameter actually mattered*.
+
+### Tables — structured, inspectable data
+
+`wandb.Table` logs rows of structured data rather than single numbers — and the columns can hold images, audio, or text, not just scalars. The typical use is dumping a handful of misclassified samples every epoch, or a confusion matrix, and then browsing them interactively in the dashboard:
+
+```python
+table = wandb.Table(columns=["image", "prediction", "label", "confidence"])
+for img, pred, label, conf in wrong_predictions[:32]:
+    table.add_data(wandb.Image(img), pred, label, conf)
+wandb.log({"errors": table})
+```
+
+This is where tracking stops being about curves and starts being about actually understanding failure modes: sortable, filterable rows of *what the model got wrong*, attached to the run that produced them.
+
+## Visualization & Debugging
+
+### Media logging
+
+`wandb.log` accepts more than numbers. Wrap a value in the matching media type and it gets rendered in the dashboard:
+
+```python
+wandb.log({
+    "sample":     wandb.Image(generated_img, caption="epoch 10"),
+    "audio":      wandb.Audio(waveform, sample_rate=16000),
+    "pointcloud": wandb.Object3D(points),
+    "rollout":    wandb.Video(frames, fps=30),
+})
+```
+
+Images, audio, 3D objects, video, molecules, and plots are all supported. For generative models this is often more informative than the loss curve — a falling loss with visibly degrading samples is a bug you would otherwise miss entirely.
+
+### `wandb.watch` — gradient and weight histograms
+
+`wandb.watch(model, log="all", log_freq=100)` hooks into your PyTorch model and records histograms of weights and gradients every `log_freq` steps. Reading those histograms is one of the fastest ways to diagnose a training failure:
+
+- Gradient histograms collapsing toward zero → **vanishing gradients**; the early layers have stopped learning.
+- Gradient histograms spreading wider and wider, or going to NaN → **exploding gradients**; try gradient clipping or a lower learning rate.
+- Weight histograms that never move → that part of the network is effectively frozen (a detached tensor, a zeroed learning rate, a `requires_grad=False` you forgot about).
+
+Use `log_freq` deliberately — histograms are expensive to compute, so logging them every step will slow training down noticeably.
+
+### System metrics
+
+GPU utilization, GPU memory, CPU load, disk, and network throughput are recorded automatically from the moment `wandb.init` is called. No configuration, no extra code. It is worth glancing at the System tab on every long run: GPU utilization sitting at 30% usually means your data loader is the bottleneck, not your model, and that is a much cheaper problem to fix than a slow model.
+
+## Collaboration & Reporting
+
+### Reports
+
+A **Report** is a shareable document that mixes prose with live panels pulled from your runs. You assemble it in the browser — drop in a loss curve from three specific runs, add a paragraph explaining what you changed, add the table of failure cases — and share the link. Because the panels stay connected to the underlying runs, the charts remain interactive for the reader rather than being flat screenshots. This is a much better artifact for "here is what I found this week" than a slide deck full of pasted images.
+
+### Comparing runs
+
+Inside a project, tick several runs in the sidebar and the workspace overlays their curves on shared axes. The runs table beside it can be sorted and filtered by any logged metric or config value, and it highlights which config keys *differ* between the selected runs — so when two runs diverge you can see immediately that the only difference was the learning rate. Grouping runs by a config key (say, by `optimizer`) draws mean-and-variance bands per group, which is the right way to read results when you have run multiple seeds.
+
+## Team & Production
+
+### Model Registry
+
+The Model Registry sits on top of Artifacts and adds a promotion workflow: you take a model artifact from some run and link it to a registered model name with a stage alias such as `staging` or `production`. Downstream code then asks for `my-model:production` instead of a hard-coded checkpoint path, so promoting a new model is a metadata change rather than a redeploy. Every promotion keeps a pointer back to the run, the config, and the dataset artifact that produced it, which is what makes "why is this model in production?" an answerable question.
+
+### Alerts
+
+`wandb.alert` sends a notification to Slack or email from inside your training script — useful when a run takes hours and you would rather not poll the dashboard:
+
+```python
+if torch.isnan(loss):
+    wandb.alert(
+        title="Training diverged",
+        text=f"Loss became NaN at step {step}",
+        level=wandb.AlertLevel.ERROR,
+    )
+```
+
+The obvious triggers are loss going NaN, a metric crossing a threshold, and training finishing — but anything you can express as an `if` in your loop can raise an alert.
+
+## Practical Notes
+
+A few things that come up as soon as you use W&B on real infrastructure:
+
+- **Offline mode.** On a cluster node with no outbound internet, set `WANDB_MODE=offline`. The run is written to `./wandb/` on disk, and you upload it later with `wandb sync ./wandb/offline-run-<id>`.
+- **Turning it off.** `WANDB_MODE=disabled` makes every `wandb` call a no-op, which is handy for quick local debugging and for tests.
+- **Private data.** Runs are private to your account by default; projects can be made public explicitly. If your data cannot leave your network at all, W&B offers self-hosted deployments.
+- **Resuming.** `wandb.init(id=run_id, resume="must")` reattaches to an existing run after a crash instead of starting a new one, so a pre-emption on a spot instance does not fragment your charts.
+
+## Wrapping Up
+
+The reason to adopt W&B is not the charts — you could plot loss curves yourself. It is that the charts, the hyperparameters, the environment, the system metrics, the dataset version, and the resulting checkpoint all end up attached to the same object, automatically, without discipline on your part. That is the difference between "I think the good run had lr=3e-4" and being able to open the run, see the exact config, and pull the exact checkpoint back down.
+
+Start with the three lines — `wandb.init`, `wandb.log`, `wandb.finish` — and add Artifacts, Sweeps, and Reports as you actually need them.
