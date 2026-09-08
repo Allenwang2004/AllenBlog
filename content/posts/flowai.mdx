@@ -1,0 +1,192 @@
+---
+title: FlowAI
+description: Building an agentic workflow system with parallel agents, ReAct subagents, RAG-based tool retrieval, and tiered context management
+descriptionEn: Building an agentic workflow system with parallel agents, ReAct subagents, RAG-based tool retrieval, and tiered context management
+slug: flowai-post
+date: 2026-07-10
+type: Post
+image: /images/flowai/cover.png
+language: en
+---
+
+### Introduction
+
+This post records some of the projects I worked on as an intern at Tymphany. Parts of the system are still under active development inside the company, so I won't go into full detail — but I want to walk through what I built, the engineering problems that came with it, and what I took away from the experience.
+
+Tymphany builds acoustic products, spanning both hardware and software. My work touched both sides, so I'll cover them in that order.
+
+## Hardware: Validating Audio Algorithms on Embedded Targets
+
+On the hardware side, my main responsibility was measuring the performance and success rate of audio algorithms running on development boards, then reporting the results back to the owning engineer so they could fix the bugs I surfaced. I didn't keep detailed records of this work, so I can only describe it in general terms — but the loop looked much like a standard edge-AI validation workflow.
+
+The algorithm is developed and verified on a workstation first, where compute is effectively free. Moving it onto a speaker or headphone development board changes the problem entirely: the target has a fixed DSP budget, limited memory, and hard real-time deadlines. Every audio frame must be processed before the next one arrives, so a run that is merely *correct* is not yet acceptable — it also has to be fast enough, every single time.
+
+That makes the testing loop look like this:
+
+- **Deploy** the build onto the target board and drive it with a controlled set of input signals — test tones, sweeps, and real recorded material.
+- **Measure** two separate classes of result. Signal-quality metrics tell you whether the algorithm still does what it did on the workstation. Runtime metrics — cycle counts, memory footprint, latency, and buffer underruns — tell you whether it fits in the budget the hardware actually has.
+- **Track the success rate** across repeated runs. On embedded targets, intermittent failures matter more than average performance: an algorithm that meets its deadline 98% of the time is still shipping audible dropouts.
+- **Report** the failing cases back to the responsible engineer with the input conditions that triggered them, so the failure can be reproduced rather than guessed at.
+
+The interesting part of this work is that most of what you find isn't wrong math — it's the gap between an algorithm that works and one that survives contact with real hardware constraints.
+
+## Software: FlowAI
+
+The larger part of my internship was software. I was primarily responsible for developing [FlowAI](https://github.com/Allenwang2004/FlowAI), an agentic workflow system. The architecture looks like this:
+
+<img
+  src="/images/flowai/Screenshot_2026-09-09_at_1.40.09_AM.png"
+  alt="FlowAI architecture: a parallel orchestrator agent dispatching concurrent subagents, each running its own ReAct loop"
+  width={800}
+  height={355}
+/>
+
+The system is organized in two tiers. A **parallel agent** acts as the brain: it decomposes an incoming request into tasks and dispatches them to subagents that execute concurrently, streaming intermediate output back up as they go. The orchestrator itself is deliberately *not* a ReAct loop — its job is planning and delegation, not tool use. Each **subagent**, on the other hand, runs a full ReAct loop and owns a specific set of tools.
+
+### What ReAct actually means
+
+ReAct — short for **Reason + Act** — is an agent pattern that interleaves reasoning with tool calls instead of separating them. Each iteration cycles through three steps:
+
+1. **Think** — the model reasons about the current state and decides what information or action it needs next.
+2. **Act** — it calls a tool or API to actually get that information or make that change in the external environment.
+3. **Observe** — the tool's result is written back into the model's context, updating what it knows before the next iteration.
+
+The loop repeats until an end condition is met or a maximum iteration count is hit. The reason this matters is that a single forward pass forces a model to commit to an entire plan before it has seen any results. A ReAct loop lets it take one step, look at what actually came back, and correct course — which is essential when the tools operate on a real artifact that can reject invalid input.
+
+In FlowAI this shows up as an explicit state machine. Each agent moves through `PLANNING → SELECT_TASK → EXECUTING → VERIFYING → REFLECTING → FINALIZING`, and every task carries its own dependency list, retry counter, and verification verdict. Failed tasks re-enter the loop through `REFLECTING` rather than aborting the run, bounded by a retry limit of 3.
+
+My goal was to have one agent system call down into subagents to execute tasks, with each subagent holding its own corresponding set of tools. In the current version those are a decision-layer agent that routes each request to either a **CanvasAgent** (requests that create or modify a design) or a **RespondAgent** (knowledge and operational Q&A), each managing its own tool execution and state.
+
+## The Target System: FlowStudio
+
+This whole system was built to drive [FlowStudioPy](https://github.com/Allenwang2004/FlowStudioPy), a desktop application supporting a wide range of audio processing operations. The initial screen looks like this:
+
+<img
+  src="/images/flowai/flowstudio.png"
+  alt="FlowStudio initial screen"
+  width={800}
+  height={450}
+/>
+
+In FlowStudio you drag out audio processing blocks and wire them into a complete pipeline, producing a flow like this:
+
+<img
+  src="/images/flowai/example.png"
+  alt="A completed audio processing pipeline built from connected DSP blocks"
+  width={720}
+  height={484}
+/>
+
+## The Core Problem: Getting an Agent to Produce a Valid Signal Flow
+
+My main task was solving one specific problem: **how do you get an agent to produce a workflow like that?** This was the biggest development obstacle the team had run into.
+
+The difficulty is that a signal flow is not free-form text. It's a typed graph with hard structural constraints — every block has a fixed number of input and output ports, and a graph whose ports don't line up is not a lower-quality design, it's an invalid one that the application simply cannot load. An LLM asked to emit one directly will produce something that *looks* plausible and fails validation.
+
+The approach we took combined RAG with an explicit validation step. User prompts are retrieved against a knowledge base of audio processing tools to find the blocks that match the request, and then a mapping algorithm confirms that the input and output counts on the graph actually align. I packaged the whole thing as a single tool exposed directly to the agent, so from the agent's point of view "find the right blocks and wire them up correctly" is one callable operation rather than a multi-step procedure it has to get right on its own.
+
+A few details worth noting from the implementation:
+
+- Retrieval runs over a FAISS vector store with a recursive character text splitter over the block documentation, wrapped in a singleton service so the index is built once per process rather than per request.
+- Pure semantic similarity turned out to be insufficient for domain vocabulary, so the retriever also carries **keyword injection rules** — an explicit override that forces specific blocks into the candidate set with a fixed high score when the prompt contains a known term. A request mentioning "compression" reliably surfaces the compressor block instead of hoping the embedding ranks it highly.
+- Validation is schema-level, not vibes-level. A separate `FlowValidator` checks required keys on every node, edge, and port, verifies identifier and color formats, and cross-references block types against a lookup table before anything reaches the canvas.
+
+### Walking through one request
+
+Here's what a run actually looks like end to end:
+
+<img
+  src="/images/flowai/Screenshot_2026-09-09_at_1.27.50_AM.png"
+  alt="A FlowAI execution trace showing routing to the Canvas Agent, followed by signal_architect, topology, and cmd tool calls with their observations"
+  width={600}
+  height={509}
+/>
+
+The demo above traces a single request — a headset playback signal flow with one mono input and two outputs, using a crossover, PEQ, compressor, and limiter. The agent works through it in stages, and you can see the ReAct loop in the alternating Action/Observation pairs:
+
+1. **Routing** — the decision layer recognizes this as a canvas request and hands it to the CanvasAgent.
+2. **`signal_architect`** — resolves the request into an explicit design intent: a mono input split by a crossover into two frequency bands, each processed by PEQ → compressor → limiter, then mixed to a stereo output. This is the step that turns an informal sentence into a structure with named blocks and a stated channel count.
+3. **`topology`** — turns that intent into concrete workflow nodes and edges, which is where the input/output alignment actually has to hold.
+4. **`cmd`** — generates the executable canvas commands. The observation reports 22 commands generated and executed successfully.
+
+Each observation feeds the next reasoning step, so a failure at the topology stage is caught and reflected on before any commands are generated.
+
+### From graph to canvas commands
+
+Getting the design onto the canvas requires one more translation, from the graph representation into the application's own command language — the large `add` block visible in the context below.
+
+<img
+  src="/images/flowai/context.png"
+  alt="Serialized agent context showing artifacts, dependency content, and the generated add/connect command list"
+  width={800}
+  height={374}
+/>
+
+This is the agent's serialized context mid-run, and it's a good illustration of what the system is actually passing around. `artifacts` holds the short summary of each completed task. `dependency_content` holds the real payload: the node list from `task_1`, and from `task_2` the concrete command list the application will execute — `add/…` commands that instantiate each block with its channel and band configuration, followed by `connect/…` commands that wire specific output ports to specific input ports. The `history` field records which agent executed which task, which made debugging multi-agent runs much easier than reading raw logs.
+
+## Context Management: Paged Tiered Memory
+
+Along the way I ran into many of the problems that come with building any agentic system. Context management was the most persistent one. Every ReAct iteration appends an observation to the context, so a long-running task grows its prompt monotonically — and eventually runs into the model's finite context window, with cost climbing the whole way there.
+
+We addressed this with **tiered context management**, introducing paged tiered context memory — a persistent working context combined with on-demand retrieval from external storage — which bounds token growth. The structure looks like this:
+
+<img
+  src="/images/flowai/Screenshot_2026-09-09_at_1.42.21_AM.png"
+  alt="Paged tiered context memory: system instructions, working context, and a FIFO queue inside the context window, backed by archival and recall storage outside it"
+  width={800}
+  height={375}
+/>
+
+The design treats the context window the way an operating system treats physical memory. Inside the window there are three regions: **system instructions**, which are read-only and static; a **working context** that the agent can rewrite through function calls, holding the facts it needs continuously available; and a **FIFO queue** of recent messages managed by a queue manager. Outside the window sit two backing stores — **archival storage** for long-term memory the agent reads and writes explicitly, and **recall storage** that the queue manager evicts older messages into.
+
+The important property is that eviction isn't deletion. When messages age out of the FIFO queue they move to recall storage and remain retrievable, so the agent can page them back in when a later task needs them. Token growth is bounded by the window size rather than by conversation length, and the agent keeps access to everything it has seen.
+
+The open design question, marked in the diagram, is whether that paging should be **implicit retrieval** — the system decides what to load — or **explicit tool calling**, where the agent asks for what it wants. Explicit calls give the agent control and make its behavior legible in the trace, but cost an extra round trip and rely on the model knowing that it's missing something.
+
+## Backend Collaboration
+
+The work also involved coordinating with the backend team; the backend repo lives at [FlowStudio_backend](https://github.com/Allenwang2004/FlowStudio_backend).
+
+## Proposing an MCP Interface
+
+Later on, I proposed restructuring the system to expose its capabilities over **MCP** (Model Context Protocol), so that more mature external agent tooling could call into it directly. The proposed shape looks like this:
+
+<img
+  src="/images/flowai/mcp.png"
+  alt="Proposed MCP architecture: the agent as an MCP client talking to a local in-process MCP server and, over SSE through a gateway, to a remote MCP server backed by HTTP services"
+  width={800}
+  height={209}
+/>
+
+The key move is separating the agent from the tools it calls. The agent becomes an **MCP client** talking to two servers: a **local MCP server** running in-process with FlowStudio, communicating over IPC and holding the operations that must touch the canvas and local memory directly; and a **remote MCP server** — the current FlowAI service — reached over SSE through an MCP gateway, with a JWT obtained from an identity provider via SSO, which in turn talks HTTP to the backend.
+
+The benefits of this arrangement are:
+
+- **The tool layer stops being locked to our agent.** Any MCP-capable client can drive FlowStudio, so we would no longer have to track improvements in agent frameworks by reimplementing them ourselves.
+- **The local/remote split follows the actual constraint.** Canvas manipulation has to happen in-process; retrieval and design generation don't. Making that boundary explicit means each side can be deployed and scaled on its own terms.
+- **Authentication moves to the gateway.** SSO and JWT verification sit in one place at the edge rather than being threaded through the agent logic.
+- **Tools become independently testable.** Once a tool is an MCP endpoint with a declared schema, you can exercise it without standing up an agent at all.
+
+## Reflections
+
+I put a lot of time into this internship. One update in particular went through a long series of revisions and optimizations across many different versions — here are the commits from that stretch:
+
+<img
+  src="/images/flowai/git.png"
+  alt="Commit history showing many successive revisions and optimizations"
+  width={480}
+  height={530}
+/>
+
+And this is the accumulated set of reports — weekly reports running from early May through late June, monthly summaries, and the final intern presentation:
+
+<img
+  src="/images/flowai/Screenshot_2026-09-09_at_1.36.42_AM.png"
+  alt="Accumulated weekly reports, monthly reports, and the final intern presentation"
+  width={800}
+  height={400}
+/>
+
+This is only one part of the internship, but I learned a great deal from it. What stayed with me most from the software side is that the hard problems in agentic systems are rarely about prompting — they're about giving the model a structured environment where invalid outputs get caught, and about managing context carefully enough that a long task doesn't collapse under its own history.
+
+And although the hardware work occupied the smallest share of my time, it sparked my interest in working with physical systems — which ended up shaping the decisions I made afterward.

@@ -119,26 +119,24 @@ const WorkExperienceSection = () => {
                   </ul>
 
                   <CustomLink
-                    href={`/experience/${exp.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={exp.link?.href ?? `/experience/${exp.id}`}
                     className="group mt-5 flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-3 transition-shadow hover:shadow-lg dark:border-gray-700 dark:bg-gray-900"
                   >
                     <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
-                      {exp.image && (
+                      {(exp.link?.image ?? exp.image) && (
                         <img
-                          src={exp.image}
-                          alt={exp.company}
+                          src={exp.link?.image ?? exp.image}
+                          alt={exp.link?.title ?? exp.company}
                           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-gray-900 group-hover:text-primary-500 dark:text-gray-100">
-                        View outcomes from this role
+                        {exp.link?.title ?? 'View outcomes from this role'}
                       </p>
                       <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
-                        Working on...
+                        {exp.link?.description ?? 'Working on...'}
                       </p>
                     </div>
                   </CustomLink>

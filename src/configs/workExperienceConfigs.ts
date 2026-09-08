@@ -10,6 +10,12 @@ export type WorkExperience = {
   summary: string;
   bullets: string[];
   image?: string;
+  link?: {
+    href: string;
+    title: string;
+    description: string;
+    image?: string;
+  };
 };
 
 export const workExperiences: WorkExperience[] = [
@@ -41,11 +47,19 @@ export const workExperiences: WorkExperience[] = [
     summary:
       'Optimizing the FlowAI agentic framework and RAG-based planning system for audio processing workflows.',
     bullets: [
-      'Optimized and stabilized the FlowAI agentic framework and the RAG system, a planning system for audio processing workflows, including context control and token consumption.',
-      'Fine-tuned large language models to generate structured audio processing pipelines, enabling automated workflow generation within the Flowstudio platform.',
-      'Built automated CI/CD pipelines for continuous evaluation and benchmarking of agent planning performance and the deployment of the agentic infrastructure.',
+      'Developed and stabilised FlowAI, an agentic RAG-based planning framework for audio-processing workflows, integrating front-end and back-end functions for an internal engineering platform.',
+      'Improved successful construction of acoustic processing flows from an initially unsuccessful state to above 90%, while adding context-memory control by adding tiered context management by introducing paged tiered context memory (persistent working context + on-demand retrieval from external storage), bounding token growth.',
+      'Ported and validated a noise-reduction model and audio DSP pipeline on an embedded board, verifying bit-level agreement within tolerance across the test set.',
+      'Used Jira, daily stand-ups and weekly written pitches to coordinate development and propose product improvements with remote colleagues. '
     ],
     image: '/images/workexperience/tymphany.jpg',
+    link: {
+      href: '/posts/flowai-post',
+      title: 'FlowAI',
+      description:
+        'Building an agentic workflow system with parallel agents, ReAct subagents, RAG-based tool retrieval, and tiered context management',
+      image: '/images/flowai/cover.png',
+    },
   },
   {
     id: 'aift',
