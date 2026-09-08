@@ -17,16 +17,15 @@ export default function HeroSection() {
 
           <h2 className="text-2xl md:text-3xl text-gray-700 dark:text-gray-300 font-semibold">
             <TypeAnimation
-              sequence={["Software Engineer", 2000, "AI Engineer", 2000, "Robot Engineer", 2000]}
+              sequence={["Software Engineer", 2000, "AI Engineer", 2000, "Robotics Researcher", 2000]}
               speed={50}
               repeat={Number.POSITIVE_INFINITY}
             />
           </h2>
 
           <p className="text-lg text-gray-600 dark:text-gray-400 max-w-xl">
-            I architect end-to-end AI systems, high-throughput automation pipelines, and scalable web/service applications. Deeply passionate about refining code craft and building with emerging technologies. Currently in the robotics sector, specializing in the deployment and optimization of Vision-Language-Action (VLA) models.
+            I build end-to-end AI systems and applications. Currently in the robotics sector, focusing on research of Vision-Language-Action (VLA) models and cross embodiment problems.
           </p>
-
           {/* <div className="pt-4">
             <a
               href="#contact"
