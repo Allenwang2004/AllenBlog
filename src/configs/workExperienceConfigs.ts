@@ -49,7 +49,7 @@ export const workExperiences: WorkExperience[] = [
     bullets: [
       'Developed and stabilised FlowAI, an agentic RAG-based planning framework for audio-processing workflows, integrating front-end and back-end functions for an internal engineering platform.',
       'Improved successful construction of acoustic processing flows from an initially unsuccessful state to above 90%, while adding context-memory control by adding tiered context management by introducing paged tiered context memory (persistent working context + on-demand retrieval from external storage), bounding token growth.',
-      'Ported and validated a noise-reduction model and audio DSP pipeline on an embedded board, verifying bit-level agreement within tolerance across the test set.',
+      'Ported and validated a noise-reduction model and audio DSP pipeline on an embedded board, comparing quantised and on-device outputs against floating-point references on a fixed test set.',
       'Used Jira, daily stand-ups and weekly written pitches to coordinate development and propose product improvements with remote colleagues. '
     ],
     image: '/images/workexperience/tymphany.jpg',
