@@ -1,25 +1,29 @@
 ---
 title: Data structure and Algorithm Roadmap
-description: Roadmap of 資料結構和演算法
+description: 從一張心智圖出發，把資料結構與演算法的觀念串成一條可以實際應用的路線
 descriptionEn: A roadmap for data structures and algorithms
 language: zh-TW
 slug: data_structure_and_algorithm-post
 date: 2025-09-06
 type: Post
-image: /images/Screenshot 2025-09-06 at 1.03.15 PM.png
+image: /images/data-structure-cover.png
 ---
 
-這個系列文章是針對資料結構跟演算法的複習，但我不會針對各個資料結構多做說明，因為相信能看到這篇文章的各位都已經很熟悉了，會直接帶入 Leetcode 上面的題目，這個系列主要是希望把這些觀念串起來，讓這些觀念可以應用在實際開發時的技能．
+## 前言
 
-![Screenshot 2025-09-06 at 12.54.28 PM.png](/images/data_structure_and_algorithm/Screenshot_2025-09-06_at_12.54.28_PM.png)
+這個系列文章是針對資料結構跟演算法的複習。我不會逐一介紹每個資料結構的定義，因為相信能看到這篇文章的各位都已經很熟悉了，而是會直接帶入 Leetcode 上的題目。
 
-那這個系列第一篇就先針對上面這張資料結構跟演算法的心智圖做一些簡單的說明
+這個系列的重點在於**把觀念串起來**：知道一個資料結構是什麼，跟知道什麼時候該用它，是兩件不同的事。前者看一次就會，後者要靠反覆遇到問題才建立得起來。
+
+![資料結構與演算法的整體心智圖，涵蓋 Array、Stack、Queue、Hash Table、Graph、Tree 與 DP](/images/data_structure_and_algorithm/Screenshot_2025-09-06_at_12.54.28_PM.png)
+
+系列第一篇就先針對上面這張心智圖做一些說明，後續的文章再逐項展開。
 
 ## Array
 
-![Screenshot 2025-09-06 at 1.04.45 PM.png](/images/data_structure_and_algorithm/Screenshot_2025-09-06_at_1.04.45_PM.png)
+![Array 的心智圖分支，包含排序演算法、靜態與動態陣列，以及各種搜尋策略](/images/data_structure_and_algorithm/Screenshot_2025-09-06_at_1.04.45_PM.png)
 
-sorting 演算法的部分不多做說明，但它提到如果是 string question，可以把它先轉成陣列，因為字串建立後是不能被修改的，所以轉為陣列為方便許多，像是
+排序演算法的部分不多做說明，但這裡提到一個實用的技巧：**如果是字串的題目，可以先把它轉成陣列**。因為字串建立後是不可變的（immutable），每次修改都會產生新的字串，轉成陣列處理會方便許多：
 
 ```python
 s = " I am a student. I love programming. "
@@ -31,120 +35,121 @@ arr = list(s)
 # ['h', 'e', 'l', 'l', 'o']
 ```
 
-### Static array && Dynamic array
+### Static array 與 Dynamic array
 
-因為我大部分都使用 python ， python 自己的靜態陣列不太常被使用，大部分的人都使用 numpy，而 python 的 list 本身就是動態陣列．
+因為我大部分都使用 Python，而 Python 自己的靜態陣列不太常被使用，大部分的人都用 NumPy；Python 的 `list` 本身則是動態陣列。
 
-static 代表它本身的大小是不能改變，存放的資料型態也不能改變
+Static 代表它的大小不能改變，存放的資料型態也是固定的：
 
 ```python
 import numpy as np
 
-a = np.array([[1,2,3]])
+a = np.array([[1, 2, 3]])
 
-a[0] = [1,2] # error
+a[0] = [1, 2]          # error：形狀不符
 
-a[0] = ['a','b','c'] # error
+a[0] = ['a', 'b', 'c'] # error：型別不符
 ```
 
-而在 numpy 中也是用 append ，但他是會複製原本的 array，再回傳，所以其實是 O(n)， list 中，append 才是 O(1)．
+NumPy 中也有 `append`，但它會複製原本的 array 再回傳，所以是 **O(n)**；`list` 的 `append` 才是攤銷後的 **O(1)**。
 
-Dynamic 雖然 append 快，但他也有缺點，因為他的記憶體分配是不連續的，相反的，static 因為型別一致，可以存放在連續的記憶體中，這樣一來 cache miss 的機率就會下降，所以才說 numpy 會適合數值計算．
+Dynamic array 雖然 append 快，但也有代價：它為了保留擴充空間，記憶體配置不像靜態陣列那麼緊密，而且 Python 的 list 存的是物件指標而不是數值本身。相反地，static array 因為型別一致、大小固定，資料可以連續存放在記憶體中，cache miss 的機率就會下降——這也是為什麼 NumPy 適合數值計算。
 
-最後還有提到 關於 searching 的部分
+### 關於搜尋
 
-- 已經 sort ，直接 Binary search O(log n) 解決
-- 還沒 sort ，但其實只需要找少量次數，直接 Linear search 就好
-- 還沒 sort ，且是字串的話，可以考慮用 Trie (字典樹) 這個資料結構
+心智圖最後提到搜尋策略的選擇，這其實是一個很好的決策範例：
 
-## Stack && Queue
+- **已經排序**：直接 Binary Search，O(log n) 解決。
+- **還沒排序，而且只需要找少數幾次**：直接 Linear Search 就好。排序本身要 O(n log n)，為了找一次而先排序並不划算。
+- **還沒排序，且是字串**：可以考慮用 **Trie**（字典樹），特別是需要做前綴比對的時候。
 
-![Screenshot 2025-09-06 at 3.19.14 PM.png](/images/data_structure_and_algorithm/Screenshot_2025-09-06_at_3.19.14_PM.png)
+## Stack 與 Queue
 
-### **Stacks (堆疊)**
+![Stack 與 Queue 的心智圖分支，列出 LIFO 與 FIFO 的操作與時間複雜度](/images/data_structure_and_algorithm/Screenshot_2025-09-06_at_3.19.14_PM.png)
 
-- **定義**：LIFO（Last In First Out，後進先出
+### Stacks（堆疊）
+
+- **定義**：LIFO（Last In First Out，後進先出）
 - 常見操作：
-    - push → 放入元素
-    - pop → 移除頂端元素
-    - peek → 查看頂端元素
-    - lookup → 找特定元素
+    - `push` → 放入元素
+    - `pop` → 移除頂端元素
+    - `peek` → 查看頂端元素
+    - `lookup` → 找特定元素
 
-這邊他有提到可以使用 array 或是 linked list 來實作，那在 python 中大部分都是用前面所提到的 動態陣列來處理
+這邊提到可以使用 array 或是 linked list 來實作，在 Python 中大部分都是直接用前面提到的動態陣列（`list`）處理，`append` 和 `pop` 都是 O(1)。
 
-### **Queues (佇列)**
+Stack 最常出現的場景是**需要回溯**的問題：括號配對、DFS、函式呼叫堆疊，本質上都是「最後放進去的最先要處理掉」。
 
-- **定義**：FIFO（First In First Out，先進先出）資料結構。
+### Queues（佇列）
 
-在 python 中是用 deque 來實作的
+- **定義**：FIFO（First In First Out，先進先出）
 
-## Hash table
+在 Python 中是用 `collections.deque` 來實作。這裡有一個很常見的錯誤是直接用 `list.pop(0)` 當作 dequeue，但那是 O(n)，因為後面所有元素都要往前搬；`deque.popleft()` 才是 O(1)。
 
-![Screenshot 2025-09-06 at 3.32.00 PM.png](/images/data_structure_and_algorithm/Screenshot_2025-09-06_at_3.32.00_PM.png)
+## Hash Table
 
-Hash table 就是用一個 **hash function (雜湊函數)** 把「key」轉換成「array index」。
+![Hash Table 的心智圖分支，說明雜湊函數、碰撞處理與時間空間的取捨](/images/data_structure_and_algorithm/Screenshot_2025-09-06_at_3.32.00_PM.png)
 
-- 例：hash("apple") → 37
-- 然後把 (key, value) 存在對應的 bucket。
-- 優點就是查找很快，O(n)
+Hash Table 就是用一個 **hash function（雜湊函數）** 把 key 轉換成 array index：
 
-在 Python，dict 和 set 就是 Hash Table。
+- 例：`hash("apple")` → 37
+- 然後把 (key, value) 存在對應的 bucket
+- 優點是查找非常快，平均 **O(1)**
 
-但它有一個註解：
+在 Python 裡，`dict` 和 `set` 就是 Hash Table。
+
+心智圖上有一個註解：
 
 > could be O(n) with hash collisions and dynamic array resizing but unlikely
-> 
 
 意思是：
 
 - 在理想情況下，hash function 分布均勻 → O(1)
-- 如果發生 **hash collision (碰撞)** → 可能退化成 O(n)
-    - 例如全部 key 都算到同一個 bucket
-    - 常見解法：
-        - **Chaining**：每個 bucket 存 linked list
-        - **Open addressing**：碰撞時往下一格找位置
-        - **Resize + Rehash ：：Python dict 的做法**
+- 如果發生 **hash collision（碰撞）**，可能退化成 O(n)，例如全部 key 都算到同一個 bucket
 
-- **Fast Access O(1), tradeoff: more memory O(n)**
-    
-    → 意思是 Hash Table 為了維持 O(1)，必須 **留出空位 (load factor < 1)**，
-    
-    所以會多耗一點記憶體。
-    
+常見的碰撞解法有：
 
-例如 Python dict 預設的 load factor 在 **2/3 左右**，超過就會 **resize (重建更大的陣列)**。
+- **Chaining**：每個 bucket 存一條 linked list
+- **Open addressing**：碰撞時往下一格找位置
+- **Resize + Rehash**：Python `dict` 採用的做法
 
-如果需要查找的資料不會太大，用 set 會是一個加快查找的好方法．
+另一個註解是 **Fast Access O(1), tradeoff: more memory O(n)**，意思是 Hash Table 為了維持 O(1)，必須刻意留出空位（load factor < 1），所以會多耗一些記憶體。例如 Python `dict` 的 load factor 大約在 **2/3** 左右，超過就會 resize，重建一個更大的陣列。
+
+實務上，如果需要查找的資料量不會太大，把 list 換成 `set` 往往是最省力的加速方式——一行的改動，就把 O(n) 的成員檢查變成 O(1)。
 
 ## Graph
 
-![Screenshot 2025-09-06 at 3.40.09 PM.png](/images/data_structure_and_algorithm/Screenshot_2025-09-06_at_3.40.09_PM.png)
+![Graph 的心智圖分支，列出有向與無向圖、加權圖以及 BFS 與 DFS](/images/data_structure_and_algorithm/Screenshot_2025-09-06_at_3.40.09_PM.png)
 
-這邊主要重點就是 BFS 跟 DFS，這個會在之後講 針對 Graph 的練習時補充
+這邊主要的重點就是 **BFS** 跟 **DFS**，這部分會在之後講 Graph 練習題時補充。
 
-除此之外，有提到關於有權圖的最短路徑，因為 BFS 所找到的最短路徑是在等權的情況下，如果是不等權的，他所找到的是 最短邊數 的選擇，而不是最短路徑， DFS 就更不用說了，針對有權圖的最短路徑演算法應該是底下這些 ：
+除此之外，關於加權圖的最短路徑要特別留意：BFS 找到的最短路徑只在**等權**的情況下成立，如果邊有不同權重，BFS 找到的是「邊數最少」的路徑，而不是「總權重最小」的路徑，DFS 就更不用說了。
 
-- Dijkstra
-- Bellmen-Ford
-- A*
+針對加權圖的最短路徑，應該使用底下這些演算法：
 
-這些演算法也會在之後的文章中介紹
+- **Dijkstra**：權重皆為非負時的標準解
+- **Bellman-Ford**：可以處理負權重的邊
+- **A\***：有額外的啟發式資訊（例如地圖上的直線距離）時，能大幅縮小搜尋範圍
+
+這些演算法也會在之後的文章中介紹。
 
 ## Tree
 
-![Screenshot 2025-09-06 at 3.40.21 PM.png](/images/data_structure_and_algorithm/Screenshot_2025-09-06_at_3.40.21_PM.png)
+![Tree 的心智圖分支，包含 Linked List、Binary Tree、BST、Balanced BST 與 Heap](/images/data_structure_and_algorithm/Screenshot_2025-09-06_at_3.40.21_PM.png)
 
-Tree 應該是這之中最重要的概念了
+Tree 應該是這之中最重要的概念了，因為後面很多結構都是它的變形。
 
 ### Linked List
 
-之所以會被放在這邊是因為，linked list 其實就是 tree 的一個特殊情況．
+之所以會被放在這邊，是因為 linked list 其實就是 tree 的一個特殊情況——每個節點只有一個子節點的樹。
 
 ### Binary Tree
 
-其中的 Binary Search Tree 代表的是對每一個節點 左子樹 < 根節點 < 右子樹，這樣一來查找的時候，只需要查找 O(h) = O(log n)，但在最壞的情況下，他一直往同一邊加，就會變成 Linked List，像是
+其中的 **Binary Search Tree** 代表對每一個節點都滿足「左子樹 < 根節點 < 右子樹」。這樣一來查找時只需要 O(h)，h 是樹的高度，在平衡的情況下 h = O(log n)。
 
-```python
+但在最壞的情況下，如果一直往同一邊加，它就會退化成 linked list：
+
+```
 1
  \
   2
@@ -154,16 +159,24 @@ Tree 應該是這之中最重要的概念了
       4
 ```
 
-這樣查找就會變成 O(n)，所以才會多出一個叫 Balanced BST，他會保證數的高度會是 log(log n)，
+這樣查找就變成 O(n)，完全失去 BST 的意義。所以才會多出 **Balanced BST** 這個概念，它會在插入與刪除時自動調整，保證樹的高度維持在 O(log n)。
 
-再細分還有 AVL 跟 Red-Black，這在之後的文章會介紹
+再細分還有 **AVL** 跟 **Red-Black Tree**，兩者的差別在於平衡的嚴格程度：AVL 查找更快但調整更頻繁，Red-Black 則在插入刪除較多的情境下表現更好。這在之後的文章會介紹。
 
 ### Heap
 
-Binary Heap 本質上 就是一棵完全二元樹，它分為 Min heap 跟 Max heap，他主要是用在 Priority queue上，因為他沒有排序結構，查找是需要 O(n)
+Binary Heap 本質上就是一棵完全二元樹，分為 **Min Heap** 跟 **Max Heap**。它主要用在 **Priority Queue** 上，取出最小（或最大）值只要 O(log n)。
+
+要注意的是 heap 只保證「父節點與子節點之間的大小關係」，兄弟節點之間沒有順序，所以要查找一個任意的值仍然需要 O(n)。**它是拿來取極值的，不是拿來搜尋的**。
 
 ## DP
 
-Dynamic programming 不算是一個資料結構，但是是一個很重要的觀念，之後也會出一篇文章，針對 DP 做詳細的介紹，包含一些經典的題目．
+Dynamic Programming 不算是一個資料結構，但是一個非常重要的觀念。它的核心是辨認出「重複計算的子問題」，把算過的結果記下來重複使用。
 
-這篇大概就講到這．主要就是一個對 資料結構 跟 演算法 的 Roadmap，在未來遇到問題的時後可以知道要用哪個資料結構跟演算法可以更有效解決問題，當然演算法是一個非常大的領域，甚至他可以再做最佳化，針對最佳化演算法之後也會出一篇文章介紹．
+之後也會出一篇文章針對 DP 做詳細的介紹，包含一些經典的題目。
+
+## 結語
+
+這篇主要就是一份資料結構跟演算法的 Roadmap。真正的價值不在於記住每個結構的複雜度表，而在於未來遇到問題時，能快速判斷「這個問題的形狀」對應到哪一個工具：需要回溯就想到 stack、需要最短路徑就想到 BFS、查找變成瓶頸就想到 hash table。
+
+當然演算法是一個非常大的領域，甚至還可以再往最佳化的方向深入，針對最佳化演算法之後也會出一篇文章介紹。

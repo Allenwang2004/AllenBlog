@@ -1,6 +1,6 @@
 ---
 title: pre-commit
-description: 使用 Husky pre-commit 優化 CI flow
+description: 使用 Husky pre-commit 在本地端提早攔截問題，優化 CI flow
 descriptionEn: Optimizing the CI flow with Husky pre-commit
 language: zh-TW
 slug: pre-commit-post
@@ -9,13 +9,21 @@ type: Post
 image: /images/download.png
 ---
 
-# Pre-commit
+## 前言
 
-除了透過 CI 在程式碼送到遠端時檢查，開發者可以事先在本地端用 **pre-commit**  攔截問題，避免無效的提交推送到伺服器，這麼做的原因是因為使用 CI 的速度通常較慢，如果能提早攔截問題，對團隊或是個人開發效率都會有所提升．
+大部分團隊都會用 CI 在程式碼推到遠端之後做檢查，但 CI 有一個先天的問題：**它太慢了**。從 push 到收到失敗通知，中間可能要等好幾分鐘，而失敗的原因往往只是少了一個分號，或是忘記跑 build。
+
+比較好的做法是在更前面就攔下來。開發者可以在本地端用 **pre-commit** 這個 Git hook，在 commit 真正產生之前先跑一輪檢查，不合格就直接擋下來。壞掉的程式碼根本沒有機會被推上伺服器，不論對團隊還是個人開發效率都會有明顯的提升。
+
+這篇會介紹如何用 Husky 設定 pre-commit，以及怎麼把它包成一個順手的 script。
 
 ## Husky
 
-Husky 是個 npm 套件，它讓使用者可以用直覺的操作方式註冊各式 hooks 事件，將各式的處理配置於各個 hooks 中，pre-commit 就是一個 hooks，除此之外，還有像是 commit-msg, post-commit 都是，但這篇只會針對 pre-commit 做介紹
+Husky 是一個 npm 套件，它讓使用者可以用直覺的方式註冊各式 Git hooks，把要執行的處理配置在各個 hook 中。
+
+`pre-commit` 只是其中一個 hook，除此之外還有 `commit-msg`（檢查 commit 訊息格式）、`post-commit`、`pre-push` 等等，但這篇只會針對 `pre-commit` 做介紹。
+
+Husky 存在的理由是：Git hooks 原本放在 `.git/hooks/` 底下，而這個目錄**不會被版本控制**，所以沒辦法分享給團隊其他人。Husky 把 hooks 移到專案裡的 `.husky/` 目錄，讓它可以跟著 repo 一起被 commit，團隊成員 `npm install` 之後就自動生效。
 
 ### 安裝 Husky
 
@@ -25,65 +33,89 @@ npm install husky --save-dev
 
 ### 初始化 Husky
 
-進入專案資料夾後，啟用 git hooks
+進入專案資料夾後，啟用 Git hooks：
 
 ```bash
 npx husky init
 ```
 
-這一步會
+這一步會做三件事：
 
-- 在根目錄下創建 .husky/ 目錄
-- 給你一個 pre-commit 的範例
-- 在 package.jsom 加上
-    
-    ```bash
+- 在根目錄下建立 `.husky/` 目錄
+- 給你一個 `pre-commit` 的範例檔案
+- 在 `package.json` 加上 `prepare` script：
+
+    ```json
     "scripts": {
       "prepare": "husky"
     }
     ```
-    
 
-接者就可以在 pre-commit 裡寫下需要檢查的 task
+`prepare` 是 npm 的生命週期腳本，會在 `npm install` 之後自動執行，這就是為什麼其他人 clone 專案後不需要額外設定，hooks 就會自己裝好。
 
-例如
+## 設定檢查項目
+
+接著就可以在 `.husky/pre-commit` 裡寫下需要執行的 task，例如：
 
 ```bash
 npm run build || exit 1
 ```
 
-這樣一來，每次 git-commit 時，它就會運行 npm build 來攔截錯誤．
+`|| exit 1` 是關鍵：只要 build 回傳非零的結束碼，這一行就會讓整個 hook 以失敗結束，Git 就會中止這次 commit。
 
-沒有報錯的輸出如下
+這樣一來，每次 `git commit` 時就會先跑一次 build 來攔截錯誤。沒有報錯時的輸出如下：
 
-![Screenshot 2025-08-25 at 2.04.25 PM.png](/images/pre-commit/Screenshot_2025-08-25_at_2.04.25_PM.png)
+![pre-commit hook 執行成功後在終端機顯示的通過訊息](/images/pre-commit/Screenshot_2025-08-25_at_2.04.25_PM.png)
 
-可以再進一步包裝成 script，正確 pre-commit 後會自動提交
+要跑 lint 或測試也是同樣的寫法，一行一個：
 
-程式碼如下
+```bash
+npm run lint || exit 1
+npm run build || exit 1
+```
+
+不過要注意的是，pre-commit 的執行時間會直接變成你每次 commit 的等待時間。如果專案的 build 要跑三分鐘，那放進 pre-commit 只會讓人想用 `--no-verify` 跳過它。**只把「快」的檢查放在 pre-commit，慢的留給 CI**，這個分工才會長久。
+
+## 包成 script
+
+再進一步，可以把整個流程包成一個 script，通過 pre-commit 檢查後就自動推送：
 
 ```bash
 #!/bin/zsh
 
 MESSAGE=$1
 
-git add
-git commit -m "message" || exit 1
+git add .
+git commit -m "$MESSAGE" || exit 1
 git push origin main
 ```
 
-在終端執行
+同樣地，`|| exit 1` 讓 commit 失敗時整個 script 就停下來，不會繼續執行 push。
+
+存成 `git-push.zsh` 之後記得給它執行權限：
+
+```bash
+chmod +x git-push.zsh
+```
+
+接著在終端機執行：
 
 ```bash
 ./git-push.zsh "commit message"
 ```
 
-如果想在 python 使用外部指令，在終端執行上面的指令
+如果想從 Python 呼叫這個外部指令，可以這樣寫：
 
-```bash
+```python
 import subprocess
 
 msg = "input message"
 
 subprocess.run(["./git-push.zsh", msg], check=True)
 ```
+
+`check=True` 會在 script 回傳非零結束碼時直接拋出例外，所以 pre-commit 擋下來的錯誤同樣會傳遞到 Python 這一層，不會被無聲地忽略掉。
+
+## 結語
+
+pre-commit 的價值不在於它能做多複雜的檢查，而在於它把「發現錯誤」的時間點從 CI 的幾分鐘縮短到 commit 的幾秒鐘。設定成本只有幾行，但省下來的等待時間會隨著專案的生命週期不斷累積。

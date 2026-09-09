@@ -1,6 +1,6 @@
 ---
 title: Digital Ocean
-description: 如何使用Digital Ocean上的 Droplet 部署交易系統和監控平台
+description: 在 DigitalOcean 的 Droplet 上部署交易系統，並用 PostgreSQL 加 Grafana 建立資產監控後台
 descriptionEn: Deploying a trading system and monitoring dashboard on a DigitalOcean Droplet
 language: zh-TW
 slug: digitalocean-post
@@ -9,42 +9,43 @@ type: Post
 image: /images/digital_ocean.png
 ---
 
-# Digital Ocean
+## 前言
 
-**這一篇來介紹一下 DigitalOcean 這個平台**
+跑量化策略有一個現實問題：策略必須 24 小時運行，但你的筆電不會 24 小時開著。所以策略遲早得搬到一台永遠開機的機器上，而這台機器最好還能順便跑一個監控後台，讓你隨時知道帳戶的資產變化。
 
-**DigitalOcean** 是一個 **雲端服務平台 (Cloud Service Provider, CSP)**，主要針對 **開發者、中小型企業、初創公司** 提供 **簡單、價格透明、容易上手** 的雲端基礎設施服務。
+**DigitalOcean** 是一個雲端服務平台（Cloud Service Provider, CSP），主要針對開發者、中小型企業與初創公司，提供簡單、價格透明、容易上手的雲端基礎設施服務。它的定位跟 AWS、GCP、Azure 類似，但更強調**易用性**與**成本可控**：一台機器一個月固定多少錢，不會出現看不懂的帳單。
 
-它的定位跟 AWS、GCP、Azure 類似，但更強調 **易用性** 與 **成本可控**。
+這篇會說明我如何在 DigitalOcean 上部署資產監控後台。策略本身的部分就看各自喜好，可以自己寫，或用開源的交易系統（這塊需要時間摸索，本文不展開）。
 
-## **Droplets**
+## Droplets
 
-其中最常被用的就是 **Droplets** 這項服務。
+DigitalOcean 最常被使用的服務就是 **Droplets**。
 
-這就像是租用了一台雲端伺服器，你可以安裝想要的系統，在上面架設網站、API 或是系統服務。
+這就像是租用了一台雲端伺服器，你可以安裝想要的作業系統，在上面架設網站、API 或是系統服務。
 
-像我的話，我在上面架了 **交易系統**，就可以做到 **24 小時全天候的交易**，還能同步架設 **資產監控後台**，是一個非常好用的服務。
+以我來說，我在上面架了**交易系統**，就可以做到 24 小時全天候的交易，還能同步架設**資產監控後台**，是一個非常好用的服務。
 
-接下來會說明我是怎麼在 DigitalOcean 上 **部署監控後台**。策略的部分就看各自喜好，可以自己寫，或用開源的交易系統（這塊需要時間摸索，本文不展開）。
+## 註冊 DigitalOcean
 
-## **註冊 DigitalOcean**
+註冊流程可以參考：[https://websitebuilder.com.tw/虛擬主機/digital-ocean/](https://websitebuilder.com.tw/虛擬主機/digital-ocean/)
 
-流程請參考 : [https://websitebuilder.com.tw/虛擬主機/digital-ocean/](https://websitebuilder.com.tw/虛擬主機/digital-ocean/)
+至於 Droplet 規格依需求挑選，我目前使用的是：
 
-至於 Droplet 規格依需求挑選，我目前使用：
+| **項目** | **規格** |
+| --- | --- |
+| CPU | Regular，1 vCPU |
+| RAM | 1 GB |
+| 儲存空間 | 25 GB SSD |
+| 流量 | 1 TB Transfer |
+| 費用 | **$6 / 月** |
 
-- Regular CPU
-- 1 vCPU
-- 1 GB RAM
-- 25 GB SSD
-- 1 TB Transfer
-- **$6 / 月**
+一個月六美金聽起來很省，但要注意 1 GB RAM 同時跑 PostgreSQL 和 Grafana 已經接近上限。如果之後要再加上策略本身，建議直接選 2 GB 的方案，不然容易遇到 OOM 把服務打掉。
 
-## **用 SSH 連線到 Droplet**
+## 用 SSH 連線到 Droplet
 
-本地端產生金鑰，並加到 Droplet（或在建立 Droplet 時直接貼公鑰）：
+在本地端產生金鑰，並加到 Droplet（或在建立 Droplet 時直接貼上公鑰）：
 
-```
+```bash
 # 本地端產生金鑰（一路 Enter）
 ssh-keygen -t rsa -b 4096 -C "you@example.com"
 
@@ -52,73 +53,181 @@ ssh-keygen -t rsa -b 4096 -C "you@example.com"
 ssh -i ~/.ssh/id_rsa root@<YOUR_DROPLET_IP>
 ```
 
-成功會看到像這樣的登入畫面
+成功會看到像這樣的登入畫面：
 
-![Untitled.jpg](/images/digitalocean/Untitled.jpg)
+![成功以 SSH 連線到 DigitalOcean Droplet 後顯示的 Ubuntu 歡迎訊息](/images/digitalocean/Untitled.jpg)
 
-## **建置監控平台（PostgreSQL + Grafana）**
+一台對外開放的機器建議在這一步就把基本防護做起來：關掉密碼登入只留金鑰、開啟 ufw 只放行必要的 port。這台機器上放的是可以動用資金的 API 金鑰，值得多花十分鐘。
 
-我採用 **Python 把策略即時資產寫進資料庫** → **Grafana 從資料庫畫圖** 的做法
+## 建置監控平台（PostgreSQL + Grafana）
 
-### **建立 docker-compose.yml**
+我採用的做法是：**Python 把策略的即時資產寫進資料庫** → **Grafana 從資料庫讀出來畫圖**。
 
-- 若只是測試：可移除 volumes，資料會存在容器內，刪容器就清空。
+這樣拆開的好處是兩邊互不影響。策略程式只負責寫資料，就算 Grafana 掛掉也不會影響交易；而資料一旦進了資料庫，之後要換視覺化工具或是拿來做回測分析都很方便。
+
+### 建立 docker-compose.yml
+
+用 Docker Compose 一次把兩個服務帶起來：
+
+```yaml
+services:
+  db:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: trader
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: assets
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
+  grafana-data:
+```
+
+`volumes` 是這份設定裡最重要的部分：它把資料存在容器之外，這樣重啟或更新容器時，歷史資產紀錄和 Grafana 的儀表板設定都不會消失。若只是想測試，可以移除 volumes，但資料就會存在容器內，刪掉容器等於全部清空。
 
 啟動：
 
-```
+```bash
 docker compose up -d
 ```
 
-## **透過 Binance API 取得帳戶資產 → 寫入 DB**
+## 透過 Binance API 取得帳戶資產並寫入 DB
 
-### **.env**
+### .env
 
-在目錄建立 .env：
+在同一個目錄建立 `.env`：
 
-```
+```bash
 BINANCE_API_KEY=你的Key
 BINANCE_API_SECRET=你的Secret
+POSTGRES_PASSWORD=你的資料庫密碼
 ```
 
-### **insert_assets.py**
+記得把 `.env` 加進 `.gitignore`。另外在 Binance 後台建立 API key 時，**只勾選讀取權限、不要開啟提現**，並綁定這台 Droplet 的 IP，這樣就算金鑰外流也拿不走資金。
 
-- 把**策略資產換算成 USDT** 再加總，並寫入 PostgreSQL。
+### 建立資料表
 
-## **Grafana 連線與儀表板**
+```sql
+CREATE TABLE IF NOT EXISTS strategy1_assets (
+  ts           TIMESTAMPTZ PRIMARY KEY DEFAULT now(),
+  spot_balance NUMERIC NOT NULL
+);
 
-1. 打開瀏覽器：http://IP:port
-    
-    更改帳密 admin/admin
-    
-2. **新增資料來源**：PostgreSQL
-    - Host：伺服器IP或localhost:5432
-    - Database：略
-    - User：略
-    - Password：略
+CREATE TABLE IF NOT EXISTS strategy2_assets (
+  ts              TIMESTAMPTZ PRIMARY KEY DEFAULT now(),
+  futures_balance NUMERIC NOT NULL
+);
+```
+
+### insert_assets.py
+
+把策略資產換算成 USDT 再加總，並寫入 PostgreSQL：
+
+```python
+import os
+
+import psycopg2
+from binance.client import Client
+from dotenv import load_dotenv
+
+load_dotenv()
+
+client = Client(os.getenv("BINANCE_API_KEY"), os.getenv("BINANCE_API_SECRET"))
+
+
+def spot_balance_in_usdt():
+    """把現貨帳戶裡所有幣種換算成 USDT 後加總。"""
+    prices = {p["symbol"]: float(p["price"]) for p in client.get_all_tickers()}
+    total = 0.0
+    for item in client.get_account()["balances"]:
+        amount = float(item["free"]) + float(item["locked"])
+        if amount == 0:
+            continue
+        asset = item["asset"]
+        if asset == "USDT":
+            total += amount
+        else:
+            total += amount * prices.get(f"{asset}USDT", 0.0)
+    return total
+
+
+def main():
+    conn = psycopg2.connect(
+        host="localhost",
+        dbname="assets",
+        user="trader",
+        password=os.getenv("POSTGRES_PASSWORD"),
+    )
+    with conn, conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO strategy1_assets (spot_balance) VALUES (%s)",
+            (spot_balance_in_usdt(),),
+        )
+    conn.close()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+最後用 cron 讓它定時執行，例如每五分鐘記錄一次：
+
+```bash
+*/5 * * * * cd /root/monitor && /usr/bin/python3 insert_assets.py >> log.txt 2>&1
+```
+
+## Grafana 連線與儀表板
+
+1. 打開瀏覽器連到 `http://<你的IP>:3000`，預設帳密是 `admin` / `admin`，第一次登入後就會要求你更改。
+
+2. **新增資料來源**：選擇 PostgreSQL
+
+    - Host：`db:5432`（Grafana 和資料庫在同一個 Compose 網路裡，直接用服務名稱）
+    - Database：`assets`
+    - User / Password：對應 `.env` 的設定
     - Save & Test → 成功
+
 3. **建立 Dashboard / Panel**，查詢資產曲線（Time series）
 
-- Spot：
+Spot：
 
-```
+```sql
 SELECT ts AS "time", spot_balance
 FROM strategy1_assets
 ORDER BY ts;
 ```
 
-- Futures：
+Futures：
 
-```
+```sql
 SELECT ts AS "time", futures_balance
 FROM strategy2_assets
-ORDER BY ts;。
+ORDER BY ts;
 ```
 
-完成到這邊，就可以得到像底下這樣的結果
+Grafana 的 Time series panel 會認 `time` 這個欄位別名當作 X 軸，所以查詢裡的 `AS "time"` 不能省略。
 
-![Screenshot 2025-08-26 at 10.25.57 PM.png](/images/digitalocean/Screenshot_2025-08-26_at_10.25.57_PM.png)
+完成到這邊，就可以得到像底下這樣的結果：
 
-監控平台的好處是，可以針對每一個策略個別監控，所以事實上是會有好幾個表，那這樣能更清楚看到策略是否失效，對交易員來說是非常重要的．
+![Grafana 儀表板上以時間序列呈現的策略資產曲線](/images/digitalocean/Screenshot_2025-08-26_at_10.25.57_PM.png)
 
-那這篇就先說明到這．之後有機會也會介紹我使用的交易系統．
+## 結語
+
+監控平台的好處是可以針對每一個策略個別監控，所以實際上會有好幾張表、好幾個 panel。這樣就能清楚看到某個策略是不是已經失效，而不是只看到總資產在跌卻找不出原因，對交易員來說是非常重要的。
+
+那這篇就先說明到這，之後有機會也會介紹我使用的交易系統。

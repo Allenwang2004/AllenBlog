@@ -6,6 +6,7 @@ import { useTranslation } from 'next-i18next';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import { useEffect, useState } from 'react';
 
+import { LOCALES } from '@/configs/i18nConfigs';
 import LayoutPerPage from '@/components/LayoutPerPage';
 import PostList, { PostForPostList } from '@/components/PostList';
 import { allPostsNewToOld } from '@/lib/contentLayerAdapter';
@@ -62,9 +63,12 @@ const Page: NextPage<Props> = ({ posts, page, totalPages }) => {
 
 export const getStaticPaths: GetStaticPaths = async () => {
   const totalPages = Math.ceil(allPostsNewToOld.length / POSTS_PER_PAGE);
-  const paths = Array.from({ length: totalPages }).map((_, idx) => ({
-    params: { page: (idx + 1).toString() },
-  }));
+  const paths = LOCALES.flatMap((locale) =>
+    Array.from({ length: totalPages }).map((_, idx) => ({
+      params: { page: (idx + 1).toString() },
+      locale,
+    }))
+  );
   return { paths, fallback: false };
 };
 

@@ -1,52 +1,68 @@
 ---
 title: Leetcode - Graph
-description: Leetcode解題紀錄
+description: 從 DFS 與 BFS 的取捨出發，整理 Top Interview 150 中的圖論題目
 descriptionEn: Leetcode problem-solving notes
 language: zh-TW
 slug: graph-post
 date: 2025-09-07
 type: Post
-image: /images/Screenshot 2025-09-06 at 5.04.01 PM.png
+image: /images/graph-cover.png
 ---
 
-這個系列會用 Leetcode 上面的題目來做資料結構跟演算法的練習，那會選擇用 Top interview 150 當作練習，因為他基本就涵蓋了前面一篇提到的 Roadmap，那首先第一篇就來講 Graph，提到 Graph，就不得不先說說 DFS 跟 BFS
+## 前言
 
-底下用圖的走訪 當作範例
+這個系列會用 Leetcode 上的題目來做資料結構跟演算法的練習，選擇 **Top Interview 150** 當作練習範圍，因為它基本涵蓋了前一篇文章提到的 Roadmap。
+
+第一篇就來講 Graph。提到 Graph，就不得不先說說 DFS 跟 BFS——幾乎所有圖論的題目，第一個決定都是「這題該用哪一個」。
+
+底下用圖的走訪當作範例來說明兩者的差異。
+
+## DFS 與 BFS 的差異
 
 ### DFS
 
-![Screenshot 2025-09-04 at 7.41.40 PM.png](/images/graph/Screenshot_2025-09-04_at_7.41.40_PM.png)
+![DFS 走訪圖的過程示意，使用 stack 沿著一條路徑深入到底後再回頭](/images/graph/Screenshot_2025-09-04_at_7.41.40_PM.png)
 
-可以看到 DFS 因為使用 stack 是 First In Last Out ( FILO ) ，所以它會受到上一個放入的節點影響，所以如果像是找尋路徑的話，他會先往一個方向到底，再往另外一個方向，但就可以找到所有的解．
+DFS 使用 stack，是 First In Last Out（FILO），所以它會受到**最後一個放入**的節點影響。如果是找尋路徑，它會先往一個方向走到底，再回頭往另一個方向，最終可以找到所有的解。
+
+實作上通常直接用遞迴，因為函式呼叫堆疊本身就是一個 stack，不需要自己維護。
 
 ### BFS
 
-![Screenshot 2025-09-04 at 7.59.10 PM.png](/images/graph/Screenshot_2025-09-04_at_7.59.10_PM.png)
+![BFS 走訪圖的過程示意，使用 queue 一層一層向外擴展](/images/graph/Screenshot_2025-09-04_at_7.59.10_PM.png)
 
-因為 queue 是 First In First Out ( FIFO )，所以它是受到一開始放入的節點的影響，所以如果是找最短路徑就會很快，因為他會同時往多個方向去找，缺點就是記憶體消耗大
+BFS 使用 queue，是 First In First Out（FIFO），所以它受到**最早放入**的節點影響。它會一層一層向外擴展，所以找最短路徑會很快——第一次抵達終點時，走過的層數必然就是最少步數。缺點是記憶體消耗大，因為要同時存下整層的節點。
 
-所以在使用方面，我的選擇依據會是
+所以在使用上，我的選擇依據是：
 
-- 窮舉所有解 : DFS
-- 找出最短路徑 : BFS
+| **需求** | **選擇** | **原因** |
+| --- | --- | --- |
+| 窮舉所有解 | DFS | 走到底再回頭，天然適合列舉完整路徑 |
+| 找出最短路徑 | BFS | 逐層擴展，第一次抵達就是最短 |
 
-那接下來就進入解題
+記住這個對照表，大部分的圖論題目在讀完題目的第一句就能決定方向了。
 
-### **Course Schedule**
+那接下來就進入解題。底下的程式碼都預設已經匯入：
 
-這是一個非常重要的經典問題，求修課的順序
+```python
+from collections import defaultdict, deque
+```
 
-白話文就是一個有向循環圖 DAG，請找到他的拓樸排序
+## Course Schedule
 
-那最常用的演算法就是 **Kahn’s algorithm**
+這是一個非常重要的經典問題。白話文就是：給定一張有向無環圖（DAG），判斷它是否存在拓樸排序。
 
-它會找 indegree 為 0 的地方開始往下走，走到下一個點會更新新的 indegree，就這樣一直走到沒有 indegree 為止，因為有環的話就會像底下的圖
+最常用的演算法是 **Kahn's algorithm**。
 
-![Methods-2.jpg](/images/graph/Methods-2.jpg)
+它會從 indegree（入度）為 0 的節點開始往下走，每走到一個節點就更新它後繼節點的 indegree，就這樣一直走到沒有 indegree 為 0 的節點為止。
 
-可以看到 走訪到的節點數量一定不會等於 總節點數量 那就代表它沒有拓樸序列
+為什麼這樣就能判斷有沒有環？因為如果圖中存在環，環上的每個節點都會互相依賴，它們的 indegree 永遠不會降到 0，就像底下的圖：
 
-Ans :
+![有向圖中存在環時，環上節點的入度永遠無法降為 0 的示意圖](/images/graph/Methods-2.jpg)
+
+可以看到走訪到的節點數量一定不會等於總節點數量，那就代表它沒有拓樸排序。
+
+**Ans：**
 
 ```python
 class Solution(object):
@@ -56,57 +72,64 @@ class Solution(object):
         :type prerequisites: List[List[int]]
         :rtype: bool
         """
-        # 紀錄要先修幾門課
+        # 紀錄每門課要先修幾門課
         indegree = [0] * numCourses
         # 紀錄依賴關係
         graph = defaultdict(list)
-        
+
         # 初始化
         for course, pre in prerequisites:
             graph[pre].append(course)
             indegree[course] += 1
-        
-        # 放入 indegree 為 0 的 作為起點
+
+        # 放入 indegree 為 0 的作為起點
         queue = deque()
         for i in range(numCourses):
             if indegree[i] == 0:
                 queue.append(i)
-        
-        # 記錄已經修的堂數
+
+        # 紀錄已經修的堂數
         taken = 0
 
-        # 當 queue 還有剩
         while queue:
             curr = queue.popleft()
             taken += 1
 
-            # 更新
+            # 修完這門課後，更新後續課程的 indegree
             for course in graph[curr]:
                 indegree[course] -= 1
                 if indegree[course] == 0:
                     queue.append(course)
-        
+
         # 最後看是否有走完
         return taken == numCourses
 ```
 
-### **Course Schedule II**
+時間複雜度是 O(V + E)，每個節點和每條邊都只會被處理一次。
 
-這一題跟前面跟上一題幾乎是一模一樣，只要加上記住順序的 array 就好，所以就不附上答案
+## Course Schedule II
 
-### Number of Islands
+這一題跟上一題幾乎一模一樣，差別只在於前一題問「能不能修完」，這一題要求**實際的修課順序**。
 
-這一題它想問有幾個獨立的島嶼，1 代表陸地，0代表海
+所以只要加上一個 array 記錄 `popleft` 出來的順序，最後判斷長度是否等於 `numCourses`，是就回傳這個 array，否則回傳空陣列。因為改動很小，這邊就不附上完整答案。
 
-![Screenshot 2025-09-04 at 6.55.00 PM.png](/images/graph/Screenshot_2025-09-04_at_6.55.00_PM.png)
+## Number of Islands
 
-他的解法會是這樣
+這一題問的是有幾個獨立的島嶼，`1` 代表陸地，`0` 代表海：
 
-1. 遍歷整個 grid
-2. 遇到 '1' 表示發現一座新島嶼，那我們要如何記錄我們已經走過，我們可以把這個島嶼重新標記為 0，那怎麼做呢，就是用 DFS 去找所有相鄰的區域
-3. 每次成功啟動 DFS，island_count +1
+![Number of Islands 的輸入範例網格，1 代表陸地、0 代表海](/images/graph/Screenshot_2025-09-04_at_6.55.00_PM.png)
 
-Ans : 
+這是一類很典型的題目：**網格本身就是一張圖**，每一格是節點，上下左右相鄰就是邊。
+
+解法會是這樣：
+
+1. 遍歷整個 grid。
+2. 遇到 `'1'` 表示發現一座新島嶼。那要如何記錄已經走過？可以直接把走過的格子重新標記為 `'0'`，用 DFS 去找所有相鄰的陸地並一併標記。
+3. 每次成功啟動一次 DFS，`count + 1`。
+
+把走過的格子直接改成 `'0'` 是這題的關鍵技巧：不需要額外的 visited 集合，網格本身就是狀態。
+
+**Ans：**
 
 ```python
 class Solution(object):
@@ -115,39 +138,40 @@ class Solution(object):
         :type grid: List[List[str]]
         :rtype: int
         """
-        
         rows, cols = len(grid), len(grid[0])
         count = 0
 
-        def dfs(r,c):
-            if r<0 or c<0 or r>=rows or c>=cols or grid[r][c] != '1':
+        def dfs(r, c):
+            if r < 0 or c < 0 or r >= rows or c >= cols or grid[r][c] != '1':
                 return
-            
+
             grid[r][c] = '0'
 
-            dfs(r-1,c)
-            dfs(r+1,c)
-            dfs(r,c-1)
-            dfs(r,c+1)
-        
+            dfs(r - 1, c)
+            dfs(r + 1, c)
+            dfs(r, c - 1)
+            dfs(r, c + 1)
+
         for i in range(rows):
             for j in range(cols):
                 if grid[i][j] == '1':
                     count += 1
-                    dfs(i,j)
-        
+                    dfs(i, j)
+
         return count
 ```
 
-### **Surrounded Regions**
+## Surrounded Regions
 
-這題是要你把被包圍的 O 轉換為 X
+這題是要把被包圍的 `O` 轉換為 `X`：
 
-![Screenshot 2025-09-04 at 7.06.31 PM.png](/images/graph/Screenshot_2025-09-04_at_7.06.31_PM.png)
+![Surrounded Regions 的輸入與輸出範例，被 X 包圍的 O 會被翻轉](/images/graph/Screenshot_2025-09-04_at_7.06.31_PM.png)
 
-它的解題技巧是要先找到不會被包圍的，也就是跟邊界相連，那其實就只要針對邊界做 DFS ，找到所有跟邊界相連的 O 就可以了
+解題技巧是**反過來想**：與其去判斷哪些 `O` 被包圍了（很難），不如先找出哪些 `O` 不會被包圍（很容易）。
 
-Ans : 
+不會被包圍的就是與邊界相連的那些，所以只要從邊界上的每一格做 DFS，把碰得到的 `O` 全部標記起來，剩下沒被標記的就一定是被包圍的。
+
+**Ans：**
 
 ```python
 class Solution(object):
@@ -156,29 +180,28 @@ class Solution(object):
         :type board: List[List[str]]
         :rtype: None Do not return anything, modify board in-place instead.
         """
-        
         rows, cols = len(board), len(board[0])
 
-        def dfs(r,c):
-            if r<0 or c<0 or r>=rows or c>= cols or board[r][c]!='O':
+        def dfs(r, c):
+            if r < 0 or c < 0 or r >= rows or c >= cols or board[r][c] != 'O':
                 return
-            
-            # 與邊界相連的 先記做 #
+
+            # 與邊界相連的，先記做 #
             board[r][c] = '#'
 
-            dfs(r-1,c)
-            dfs(r+1,c)
-            dfs(r,c-1)
-            dfs(r,c+1)
-        
-        # 用最外圈的每一格做 dfs 找到與邊界相連的 O
+            dfs(r - 1, c)
+            dfs(r + 1, c)
+            dfs(r, c - 1)
+            dfs(r, c + 1)
+
+        # 用最外圈的每一格做 dfs，找到與邊界相連的 O
         for r in range(rows):
-            dfs(r,0)
-            dfs(r,cols-1)
+            dfs(r, 0)
+            dfs(r, cols - 1)
         for c in range(cols):
-            dfs(0,c)
-            dfs(rows-1,c)
-        
+            dfs(0, c)
+            dfs(rows - 1, c)
+
         # 最後再執行轉換
         for i in range(rows):
             for j in range(cols):
@@ -188,18 +211,20 @@ class Solution(object):
                     board[i][j] = 'O'
 ```
 
-### **Clone Graph**
+## Clone Graph
 
-複製一張圖，要做的事情就是 Graph travesal 那就直接使用 DFS，邏輯如下
+複製一張圖，要做的事情就是 graph traversal，直接使用 DFS。邏輯如下：
 
 1. 建立新節點
 2. 用 DFS 往下接上相鄰的邊
 
- 流程如下 : 
+流程如下：
 
-![Leetcode-3.jpg](/images/graph/Leetcode-3.jpg)
+![Clone Graph 的遞迴複製流程，用雜湊表記錄舊節點與新節點的對應](/images/graph/Leetcode-3.jpg)
 
-Ans :
+這題的關鍵是那個 `visited` 字典：它同時扮演兩個角色——**防止無限遞迴**，以及**記錄舊節點到新節點的對應**。少了它，遇到環的時候就會無限展開。
+
+**Ans：**
 
 ```python
 class Solution(object):
@@ -210,45 +235,50 @@ class Solution(object):
         """
         if not node:
             return None
-        
-        # 紀錄 新節點跟舊節點的連接 因為判斷完走訪後 回傳的會是新節點
+
+        # 紀錄舊節點與新節點的對應，因為走訪完後要回傳的是新節點
         visited = {}
 
         def dfs(n):
-            # 已經走訪過 直接回傳新節點
+            # 已經走訪過，直接回傳對應的新節點
             if n in visited:
                 return visited[n]
 
             # 沒走過就複製
             clone = Node(n.val)
-            visited[n] = clone    
-            
+            visited[n] = clone
+
             for neighbor in n.neighbors:
                 clone.neighbors.append(dfs(neighbor))
-            
-            # 回傳 Node
+
             return clone
-        
+
         return dfs(node)
 ```
 
-### **Evaluate Division**
+注意 `visited[n] = clone` 必須寫在遞迴呼叫**之前**。如果放在後面，遇到環時會在自己還沒被登記進 visited 之前又走回自己，一樣會無限遞迴。
 
-這一題比較特別的是，除了要記住每個點可以通到哪些邊，還有記得每個邊上的數字，但這並不是有權圖的問題，所以我們一樣可以用 DFS 來解
+## Evaluate Division
 
-那剛剛提到 graph 比較特別，他要存的東西是像
+這一題比較特別的地方是，除了要記住每個點可以通到哪些點，還要記得每條邊上的數字。不過這並不是加權圖最短路徑的問題（我們要的是路徑上的乘積，而不是最小值），所以一樣可以用 DFS 來解。
+
+剛剛提到 graph 比較特別，它要存的東西像這樣：
 
 ```python
 graph = {
     "a": {"b": 2.0},
     "b": {"a": 0.5, "c": 3.0},
-	  "c": {"b": 1/3.0}
+    "c": {"b": 1 / 3.0}
 }
 ```
 
-那 DFS 的概念如下
+也就是說，每建立一條邊 a/b = val，就同時記下反方向的 b/a = 1/val，這樣查詢時就不用管方向。
 
-![Leetcode-4.jpg](/images/graph/Leetcode-4.jpg)
+DFS 的概念如下：
+
+![Evaluate Division 沿路徑累乘邊權重求出比值的示意圖](/images/graph/Leetcode-4.jpg)
+
+**Ans：**
 
 ```python
 class Solution(object):
@@ -260,21 +290,21 @@ class Solution(object):
         :rtype: List[float]
         """
         graph = defaultdict(dict)
-        for (a,b) , val in zip(equations, values):
+        for (a, b), val in zip(equations, values):
             graph[a][b] = val
             graph[b][a] = 1 / val
 
-        def dfs(src,dst,visited):
+        def dfs(src, dst, visited):
             if src not in graph or dst not in graph:
                 return -1.0
             if src == dst:
                 return 1.0
-            
+
             visited.add(src)
             for neighbor in graph[src]:
                 if neighbor in visited:
                     continue
-                result = dfs(neighbor,dst,visited)
+                result = dfs(neighbor, dst, visited)
                 if result != -1.0:
                     return graph[src][neighbor] * result
 
@@ -283,15 +313,17 @@ class Solution(object):
         result = []
         for src, dst in queries:
             visited = set()
-            result.append(dfs(src,dst,visited))
+            result.append(dfs(src, dst, visited))
         return result
 ```
 
-### **Snakes and Ladders**
+## Snakes and Ladders
 
-這一題是在做小時候大家都玩過的遊戲， 那他要問的是 least number of dice rolls ，所以很明顯的就是最短路徑的問題，所以我們用 BFS 來解它，那它有一個額外的小問題要解決，就是它編號的方式跟一般由上到下的方式不一樣，所以我們會需要寫一個函數 get_rc 來取得編號在 board 這個 matrix 的位置，才知道會不會遇到蛇或梯子，剩下的就跟一般的 BFS 一樣，完整代碼如下 
+這一題是在做小時候大家都玩過的遊戲，問的是 **least number of dice rolls**，所以很明顯是最短路徑的問題，用 BFS 來解。
 
-Ans :
+它有一個額外的小麻煩要處理：棋盤的編號方式是**蛇行排列**（boustrophedon），跟一般由上到下、由左到右的順序不一樣。所以需要寫一個函式 `get_rc` 把編號轉換成 board 這個矩陣中的位置，才知道會不會遇到蛇或梯子。剩下的就跟一般的 BFS 一樣。
+
+**Ans：**
 
 ```python
 class Solution(object):
@@ -303,43 +335,47 @@ class Solution(object):
         n = len(board)
         visited = set()
         queue = deque()
-        queue.append((1,0)) # (目前節點,目前走的步數)
+        queue.append((1, 0))  # (目前節點, 目前走的步數)
 
-        # 編號 s 對應的 rows, columns
+        # 編號 s 對應的 row, column
         def get_rc(s):
-            r = (n-1) - (s-1)//n
-            # 如果從下往上數 偶數
-            c = (s-1)%n if (n-1-r)%2==0 else (n-1) - (s-1)%n
-            return r,c
-        
+            r = (n - 1) - (s - 1) // n
+            # 判斷這一列是由左往右還是由右往左
+            c = (s - 1) % n if (n - 1 - r) % 2 == 0 else (n - 1) - (s - 1) % n
+            return r, c
+
         while queue:
             s, move = queue.popleft()
             # 抵達就是最短路徑
-            if s == n*n:
+            if s == n * n:
                 return move
-            for i in range(1,7):
+            for i in range(1, 7):
                 next_s = s + i
-                if next_s > n*n:
+                if next_s > n * n:
                     continue
-                r,c = get_rc(next_s)
+                r, c = get_rc(next_s)
 
                 if board[r][c] != -1:
                     next_s = board[r][c]
                 if next_s not in visited:
                     visited.add(next_s)
-                    queue.append((next_s,move+1))
-        return -1   
+                    queue.append((next_s, move + 1))
+        return -1
 ```
 
-### **Minimum Genetic Mutation**
+這裡「每一步最多擲出 6 點」就是每個節點最多有 6 個鄰居，所以整張棋盤其實是一張最多 n² 個節點的圖。
 
-範例說明 :
+## Minimum Genetic Mutation
 
-![Screenshot 2025-09-06 at 9.05.45 PM.png](/images/graph/Screenshot_2025-09-06_at_9.05.45_PM.png)
+範例說明：
 
-每次都只能動一個 在 ‘A ’, ‘ C ‘, ‘ G ‘, ‘ T ‘ 中的一個字符， 這題是底下 Word Ladder 的狹義版，所以這邊不多說明，可以直接往下看下一題．
+![Minimum Genetic Mutation 的輸入範例：起始基因、目標基因與可用的基因庫](/images/graph/Screenshot_2025-09-06_at_9.05.45_PM.png)
 
-Ans :
+每次只能改動一個字元，而字元只能是 `A`、`C`、`G`、`T` 其中之一。
+
+這題是底下 Word Ladder 的狹義版本——差別只在字母表從 26 個英文字母縮成 4 個鹼基。所以這邊不多說明，可以直接往下看下一題。
+
+**Ans：**
 
 ```python
 class Solution(object):
@@ -350,72 +386,71 @@ class Solution(object):
         :type bank: List[str]
         :rtype: int
         """
-        bank = set(bank) # 加速查找
+        bank = set(bank)  # 加速查找
 
-        genes = ['A','C','G','T']
-        queue = deque([(startGene,0)])
+        genes = ['A', 'C', 'G', 'T']
+        queue = deque([(startGene, 0)])
 
         while queue:
             current, move = queue.popleft()
             if current == endGene:
                 return move
-            
+
             for i in range(len(current)):
                 for g in genes:
                     if g == current[i]:
                         continue
-                    mutate = current[:i] + g + current[i+1:]
+                    mutate = current[:i] + g + current[i + 1:]
                     if mutate in bank:
                         bank.remove(mutate)
-                        queue.append((mutate,move+1))
+                        queue.append((mutate, move + 1))
 
-        return -1 
+        return -1
 ```
 
-### **Word Ladder**
+## Word Ladder
 
-範例說明 :
+範例說明：
 
-![Screenshot 2025-09-06 at 8.45.59 PM.png](/images/graph/Screenshot_2025-09-06_at_8.45.59_PM.png)
+![Word Ladder 的輸入範例：起始單字、目標單字與字典清單](/images/graph/Screenshot_2025-09-06_at_8.45.59_PM.png)
 
-這一題是上一題的廣義版本，所以被列為 hard
+這一題是上一題的廣義版本，所以被列為 hard。
 
-那因為他找的是 shortest transformation sequence，所以就用 BFS 來解決它，那因為它已經給了所有的節點，所以可以用 remove 的方式來做是否經過的處理．那這邊會用 set 來處理，因為我們只需要好查找．
+因為它找的是 shortest transformation sequence，就用 BFS 來解決。而因為題目已經給了所有可用的節點（`wordList`），可以用「從集合中移除」的方式來處理是否走訪過——這邊會用 `set` 而不是 `list`，因為我們只需要快速查找。
 
-所以先不管如何找到下一個節點，程式碼應該如下 : 
+先不管如何找到下一個節點，程式碼的骨架應該長這樣：
 
 ```python
 class Solution(object):
     def ladderLength(self, beginWord, endWord, wordList):
-
         wordSet = set(wordList)
         if endWord not in wordSet:
             return 0
 
         queue = deque()
-        queue.append((beginWord, 1))  # BFS 會嘗試所有鄰居 在同一個 step 
+        queue.append((beginWord, 1))  # BFS 會在同一個 step 嘗試所有鄰居
 
         while queue:
             word, steps = queue.popleft()
             if word == endWord:
                 return steps
 
-            # 假設走過某個點
-            if next_word in word_set:
-                queue.append((next_word,steps+1))
-                wordSet.remove(next_word)
+            # TODO: 在這裡產生所有 next_word
+            # 找到一個就放進 queue，並從 wordSet 移除避免重複走訪
 
         return 0  # 找不到轉換路徑
 ```
 
-那找尋下一個點的邏輯是什麼，因為每一次只會更改一個字，那就可以針對字串裡的每個字，用所有的英文字去替代，看他會不會在 Wordset 裡，會的話就可以繼續放到 queue 裡，繼續替換，一直到我們碰到 endWord，所以整串程式碼會變 
+那找尋下一個點的邏輯是什麼？因為每一次只會更改一個字，所以可以針對字串裡的每個位置，用所有的英文字母去替代，看替換後的結果在不在 `wordSet` 裡。在的話就放進 queue 繼續替換，一直到碰到 `endWord`。
 
-Ans :
+補上這段之後，完整的程式碼會變成：
+
+**Ans：**
 
 ```python
 class Solution(object):
     def ladderLength(self, beginWord, endWord, wordList):
-        wordSet = set(wordList)  
+        wordSet = set(wordList)
         if endWord not in wordSet:
             return 0
 
@@ -429,10 +464,22 @@ class Solution(object):
 
             for i in range(len(word)):
                 for c in 'abcdefghijklmnopqrstuvwxyz':
-                    next_word = word[:i] + c + word[i+1:]
+                    next_word = word[:i] + c + word[i + 1:]
                     if next_word in wordSet:
                         queue.append((next_word, steps + 1))
                         wordSet.remove(next_word)
-                        
-        return 0 
+
+        return 0
 ```
+
+`wordSet.remove(next_word)` 必須在放進 queue 的當下就執行，而不是等實際走訪到它的時候。否則同一個單字可能被不同的前驅節點重複加入 queue，複雜度會爆炸。
+
+## 結語
+
+回頭看這幾題，會發現它們幾乎都可以拆成同樣三個步驟：
+
+1. **辨認出圖**：節點是什麼？邊是什麼？網格題的節點是格子，Word Ladder 的節點是單字。
+2. **決定 DFS 還是 BFS**：問「有幾個」「所有的」用 DFS，問「最少幾步」用 BFS。
+3. **處理走訪紀錄**：用 visited 集合、直接改寫原資料，或是從集合中移除。
+
+題目的外觀變化很多，但這個框架幾乎不變。下一篇會繼續往 Tree 的題目走。

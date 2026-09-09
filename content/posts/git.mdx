@@ -1,6 +1,6 @@
 ---
 title: Git
-description: 如何使用git進行協作
+description: 如何使用 Git 進行版本控制與團隊協作
 descriptionEn: How to collaborate using Git
 language: zh-TW
 slug: git-post
@@ -9,33 +9,42 @@ type: Post
 image: /images/cover.png
 ---
 
-這篇文章紀錄我目前使用 git 常用的指令，未來可能會持續更新
+## 前言
 
-開始前先附上一張梗圖
+Git 大概是唯一一個「不學也能用，但不學就會出事」的工具。多數人一開始只會 `add`、`commit`、`push` 三個指令，直到某天在多人專案裡把別人的程式碼覆蓋掉，才開始認真理解分支到底是什麼。
 
-![download.jpeg](/images/git/download.jpeg)
+這篇文章整理我日常會用到的 Git 指令與工作流程，重點不在指令表本身，而在於「什麼情況該用哪一個」。內容會持續更新。
 
-其實蠻有道理的…
+開始前先附上一張梗圖：
+
+![關於 Git 分支合併衝突的網路梗圖](/images/git/download.jpeg)
+
+其實蠻有道理的，因為多數 Git 的災難都發生在「合併」這一步。
 
 ## 初始設定
 
+每個 commit 都會記錄作者資訊，所以裝好 Git 的第一件事就是把身分設定好。這是全域設定，只需要做一次：
+
 ```bash
-# 設定全域使用者資訊
 git config --global user.name "你的名稱"
 git config --global user.email "你的電子郵件"
 ```
 
+如果某個專案需要用不同身分（例如公司的信箱），在該專案目錄下拿掉 `--global` 再設定一次即可，專案層級的設定會覆蓋全域設定。
+
 ### GitHub CLI 認證
+
+若要從終端機直接操作 GitHub（開 PR、建立 repo），安裝 `gh` 之後登入一次就好：
 
 ```bash
 gh auth login
 ```
 
----
-
 ## 基本操作
 
 ### 建立新倉庫
+
+從一個空目錄開始到推上 GitHub，完整流程是這樣：
 
 ```bash
 git init
@@ -46,13 +55,15 @@ git remote add origin <GitHub-Repository-URL>
 git push -u origin main
 ```
 
+`push -u` 的 `-u` 會把本地分支和遠端分支綁定，之後只要打 `git push` 就好，不用每次都指定 remote 和分支名稱。
+
 ### 日常更新流程
 
-如果是小型專案，但依然推薦可以練習更底下的分支管理
+如果是自己一個人的小型專案，直接在 main 上作業也不是不行，但仍然推薦練習後面的分支管理，養成習慣之後在團隊裡才不會出錯。
 
 ```bash
 # 推送更新
-git add .  # 或指定檔案：git add filename.txt
+git add .                 # 或指定檔案：git add filename.txt
 git commit -m "Update files"
 git push origin main
 
@@ -66,15 +77,13 @@ git status
 git log
 ```
 
-這邊有個小建議是不管怎麼樣都先
+這邊有個小建議是，不管怎麼樣都先執行：
 
 ```bash
 git diff
 ```
 
-看一下你到底做了什麼事，那他其實就是比較你的 local 跟你電腦 disk 存放的差異
-
----
+看一下你到底改了什麼。`git diff` 比較的是工作目錄和暫存區（staging area）的差異，也就是「你改了但還沒 `add` 的部分」；如果已經 `add` 過了，要用 `git diff --staged` 才看得到。花十秒鐘確認一次，可以省掉之後很多修 commit 的時間。
 
 ## 分支管理
 
@@ -87,68 +96,78 @@ git branch <branch_name>
 # 切換分支
 git checkout <branch_name>
 
+# 建立並直接切過去（等於上面兩行）
+git checkout -b <branch_name>
+
 # 查看所有分支
 git branch
 
-# 切換到 master 分支
-git branch -m master
+# 重新命名目前分支
+git branch -m <new_name>
 ```
 
 ### 分支合併
 
-這裡，我的習慣是都在分支上做開發，然後修改完後，如果是多人協作的情況，本地的 main 很有可能已經落後遠端的 main 這時候就要做
+我的習慣是所有開發都在分支上做。修改完之後，如果是多人協作的情況，本地的 main 很可能已經落後遠端的 main，這時候要先把 main 更新到最新，再把自己的分支接上去：
 
 ```bash
 git checkout main
-
 git pull origin main
 
 git checkout <branch_name>
+git rebase main
+```
 
-git rebase main //如果有衝突，這時要解決再繼續 git rebase --continue。
+`rebase` 如果遇到衝突，解決衝突後執行 `git rebase --continue` 繼續，直到 rebase 完成。接著把整理過的分支推上遠端：
 
+```bash
 git push -f origin <branch_name>
+```
 
-接著再發 pull request
+這裡需要 `-f`（force）是因為 rebase 會重寫 commit 的雜湊值，遠端上的舊 commit 和本地已經對不起來了。也因為會重寫歷史，**只能對自己的分支做 rebase，不要對別人也在用的共用分支做**。
 
+推上去之後再發 pull request，合併完成後把本地的 main 更新回來：
+
+```bash
 git checkout main
-
 git pull origin main
 ```
-就算你是自行開發也建議這麼做，這樣可以確保主分支永遠都是乾淨的
 
----
+就算你是自行開發也建議這麼做，這樣可以確保主分支永遠是乾淨的、線性的歷史，之後要找出某個 bug 是哪個 commit 引入的會容易非常多。
 
 ### 強制同步
 
-如果你不小心毀了一些東西，還丟到了遠端上，可以像底下這樣
+如果你不小心毀了一些東西，而且還推到了遠端上，可以像底下這樣把分支拉回某個正常的 commit：
 
 ```bash
-
 # 回到特定 commit 狀態
 git reset --hard <commit>
 git push origin main --force
 ```
 
----
+`--hard` 會直接丟掉工作目錄中未提交的修改，執行前務必確認自己沒有還沒存的東西。如果只是想撤銷某個已經公開的 commit，比較安全的做法是用 `git revert <commit>`，它會產生一個「反向的 commit」而不是抹掉歷史。
 
 ## 檔案管理
 
-### .gitignore 設定
+### 讓 .gitignore 生效
+
+`.gitignore` 只對「還沒被追蹤的檔案」有效。如果一個檔案已經被 commit 過，之後才加進 `.gitignore`，Git 還是會繼續追蹤它，需要手動把它從索引中移除：
 
 ```bash
-# 讓 .gitignore 生效（移除已追蹤的檔案）
+# 讓 .gitignore 生效（移除已追蹤的檔案，但保留本地檔案）
 git rm -r --cached .
 
 # 停止追蹤特定檔案
 git rm --cached -r __pycache__/
 ```
 
+`--cached` 很重要，少了它就會連本地的檔案一起刪掉。
+
 ### .gitignore 常見用法
 
-建立 `.gitignore` 檔案來忽略不需要版本控制的檔案，底下說明一些我平常會用的 :
+底下說明一些我平常會加的項目：
 
-### **系統檔案**
+**系統檔案**
 
 ```
 .DS_Store
@@ -158,7 +177,7 @@ git rm --cached -r __pycache__/
 .Trashes
 ```
 
-### **編輯器和 IDE**
+**編輯器和 IDE**
 
 ```
 # Visual Studio Code
@@ -166,7 +185,9 @@ git rm --cached -r __pycache__/
 *.code-workspace
 ```
 
-### **敏感資訊**
+**敏感資訊**
+
+這一類是最重要的，金鑰一旦被推上公開的 repo，即使之後刪掉，也已經留在 Git 歷史裡了：
 
 ```
 # 環境變數和設定檔
@@ -184,11 +205,11 @@ config.json
 secrets.json
 ```
 
----
-
 ## 特殊情況處理
 
 ### 連接現有遠端倉庫
+
+如果本地已經有程式碼，遠端也已經有內容（例如 GitHub 幫你建的 README），兩邊的歷史是完全無關的，直接 pull 會被拒絕：
 
 ```bash
 git init
@@ -197,16 +218,22 @@ git pull origin main --allow-unrelated-histories
 # 之後按正常流程操作
 ```
 
-### 強制合併不相關歷史
+`--allow-unrelated-histories` 就是告訴 Git「我知道這兩段歷史沒有共同祖先，還是合併它們」。
 
-```bash
-git pull origin main --allow-unrelated-histories
-```
-
----
-
-### 進階功能
+## 進階功能
 
 ### Git Submodules
 
-`.gitmodule` 文件用於管理子模組，類似將其他 repo 當作套件使用的概念。
+`.gitmodules` 用於管理子模組，概念類似把另一個 repo 當作套件掛進來使用，適合共用的函式庫或是需要固定版本的第三方程式碼。子模組會被固定在某一個特定的 commit，所以主專案不會因為對方更新而突然壞掉。
+
+```bash
+# 加入子模組
+git submodule add <repo-url> <path>
+
+# clone 一個含子模組的專案時，一併把子模組拉下來
+git clone --recurse-submodules <repo-url>
+```
+
+## 結語
+
+Git 的指令很多，但日常會反覆用到的其實就是前面那幾組。真正需要花時間建立的是習慣：**改動前先 `git diff`、開發一律在分支上、合併前先把 main 更新到最新**。這三件事做到了，大部分的協作問題都不會發生。

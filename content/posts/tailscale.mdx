@@ -1,87 +1,117 @@
 ---
 title: Tailscale
-description: 如何用 tailscale 連接 remote server
+description: 用 Tailscale 穿透 NAT，從外網 SSH 連進家中的遠端 server
 descriptionEn: Connecting to a remote server with Tailscale
 language: zh-TW
 slug: tailscale-post
 date: 2025-09-05
 type: Post
-image: /images/Screenshot 2025-09-06 at 1.15.31 AM.png
+image: /images/tailscale-cover.png
 ---
 
-# Remote Server
+## 前言
 
-這篇文章會介紹如何建立和遠端 server 的 ssh 連線，會想怎麼做是因為想打造自己的 Homelab 雖然目前是以舊 PC 作為 server ，但未來也希望可以增加更多設備，用更好的顯卡，做到更多事情．
+這篇文章會介紹如何建立和遠端 server 的 SSH 連線。會想做這件事是因為想打造自己的 Homelab，雖然目前只是拿一台舊 PC 當作 server，但未來也希望可以增加更多設備、換上更好的顯卡，做到更多事情。
 
-### 使用情境
+而 Homelab 的第一個關卡不是硬體，是**網路**：機器放在家裡，你人在外面，要怎麼連得進去。
 
-因為我使用的 遠端 server 接的是網路線，它是拿到路由器分配的內網 ip，內部 ip 想上網是透過 NAT，概念如下圖所示 : 
+## 問題：NAT 擋在中間
 
-![Screenshot 2025-09-05 at 11.52.06 PM.png](/images/tailscale/Screenshot_2025-09-05_at_11.52.06_PM.png)
+我使用的遠端 server 接的是網路線，拿到的是路由器分配的內網 IP。內網 IP 想要上網是透過 NAT（Network Address Translation），概念如下圖：
 
-NAT 會將內網 ip 轉為 公網 ip，電信的 ISP 才會執行傳遞的封包
+![NAT 架構示意圖：路由器把內網裝置的私有 IP 轉換成對外的公網 IP](/images/tailscale/Screenshot_2025-09-05_at_11.52.06_PM.png)
 
-但如果是外部想要連線進來，路由器不會知道要連到哪個內網 ip，所以這就會導致無法連線，有一個做法是使用 VPN 來解決，像下圖這樣
+NAT 會把內網 IP 轉為公網 IP，電信的 ISP 才會協助傳遞封包。
 
-![Screenshot 2025-09-06 at 12.29.31 AM.png](/images/tailscale/Screenshot_2025-09-06_at_12.29.31_AM.png)
+問題在於這個轉換是**單向友善**的。從內往外時，路由器會記住「這條連線是哪台機器發起的」，回來的封包就知道要送給誰；但如果是外部主動想連進來，路由器沒有任何紀錄，不會知道要轉給哪一個內網 IP，連線就直接被丟棄了。
 
-但我在這邊使用一個更快速的方法 Tailscale， 這個工具來解決問題，他跟 VPN 不一樣，他不需要一個 VPN router，只需要在設備建立 client ，然後透過 UDP hole punching，雙方同時向一個協調伺服器發送封包，建立映射表，之後彼此就能直連，也就是用 NAT 穿透的方式，直接建立 P2P 的通道，類似下圖：
+傳統上有兩種解法：一種是在路由器上設定 port forwarding，另一種是自己架 VPN，像下圖這樣：
 
-![cdd753282121c1279a392aca86adcb6d0a5d1c80-1320x775.svg](/images/tailscale/cdd753282121c1279a392aca86adcb6d0a5d1c80-1320x775.svg)
+![傳統 VPN 架構示意圖：外部裝置先連到 VPN 伺服器，再由它轉送到內網](/images/tailscale/Screenshot_2025-09-06_at_12.29.31_AM.png)
 
-接下來就來說明實作：
+兩種都可行，但都要動到路由器設定，而且如果是租屋處或是電信商給的是 CGNAT（多個用戶共用一個公網 IP），你根本沒有權限做這件事。
 
-在遠端 server 上：
+## 解法：Tailscale
 
-```
+我在這邊使用一個更快速的方法：**Tailscale**。
+
+它跟傳統 VPN 不一樣，不需要一台 VPN router，只需要在每台設備上安裝 client。連線建立的方式是 **UDP hole punching**：雙方同時向一個協調伺服器（coordination server）發送封包，各自的 NAT 因此建立了對外的映射表項目，協調伺服器再把雙方的位址交換給對方，之後兩台機器就能直接互相通訊。
+
+也就是用 NAT 穿透的方式，直接建立 P2P 的通道，類似下圖：
+
+![Tailscale 的 P2P 連線架構：裝置之間透過協調伺服器完成 NAT 穿透後直接連線](/images/tailscale/cdd753282121c1279a392aca86adcb6d0a5d1c80-1320x775.svg)
+
+關鍵是協調伺服器只負責「牽線」，實際的流量並不會經過它，所以速度取決於兩端的網路，而不是中間伺服器的頻寬。只有在 NAT 類型太嚴格、真的打不通的情況下，Tailscale 才會退而求其次，透過 DERP 中繼伺服器轉發。
+
+接下來就來說明實作。
+
+## 設定遠端 server
+
+在遠端 server 上安裝並啟用 Tailscale：
+
+```bash
 # 安裝 Tailscale
 curl -fsSL https://tailscale.com/install.sh | sh
 
-# 登入並啟用 會得到一個 ip
+# 登入並啟用，會得到一個 Tailscale 分配的 IP
 sudo tailscale up
 
-# 確保重新啟動後會重開
+# 確保重新開機後會自動啟動
 sudo systemctl enable tailscaled
 ```
 
-可以用
+`sudo tailscale up` 會給你一個登入連結，用瀏覽器登入同一個帳號之後，這台機器就加入你的 tailnet 了。
 
-```python
+可以用底下的指令確認是否取得 IP：
+
+```bash
 tailscale ip
 ```
 
-來查看是否取得內網 ip
+拿到的會是 `100.x.x.x` 開頭的位址，這是 Tailscale 專用的網段，只在你自己的 tailnet 內部有效。
 
-### **啟動 SSH 服務**
+### 啟動 SSH 服務
 
 安裝並啟動 OpenSSH：
 
-```
+```bash
 sudo apt update
 sudo apt install openssh-server -y
 sudo service ssh start
 ```
 
-### **外部電腦**
+## 設定外部電腦
 
-在外部電腦裝 Tailscale，然後一樣 Connect device
+在外部電腦裝上 Tailscale，一樣執行 Connect device 登入同一個帳號，就會看到像下面這樣的裝置列表（我是用舊 PC 作為 server）：
 
-就會得到像下面這樣 ( 我是用 舊PC 作為 server )
+![Tailscale 管理後台的裝置列表，兩台機器都已取得 100.x.x.x 開頭的位址](/images/tailscale/Screenshot_2025-09-06_at_12.24.34_AM.png)
 
-![Screenshot 2025-09-06 at 12.24.34 AM.png](/images/tailscale/Screenshot_2025-09-06_at_12.24.34_AM.png)
+兩台電腦都已經拿到 Tailscale 分配的 IP，接下來它們就可以當作在同一個區域網路裡一樣互相連線。
 
-兩台電腦都已經獲得內網 ip
+### 開啟 server 防火牆
 
-### 開啟 server防火牆
-
-```python
+```bash
 sudo ufw allow ssh
 ```
 
-接著就可以嘗試連線
+接著就可以嘗試連線：
 
-```
+```bash
 ssh <帳號>@100.xxx.xxx.xxx
 ```
 
-透過 **Tailscale**，可以快速建立屬於自己的工作內網，不論是一台筆電，還是未來逐步擴增到多台 server，都能以相同簡單的方式進行管理。這不僅適合個人開發者隨時遠端存取環境，也能讓團隊更輕鬆地串接彼此的資源。
+如果每次都要記這串 IP 有點麻煩，可以直接用 Tailscale 後台設定的機器名稱來連，或是在本地的 `~/.ssh/config` 裡加上一組別名：
+
+```
+Host homelab
+  HostName 100.xxx.xxx.xxx
+  User <帳號>
+```
+
+之後只要打 `ssh homelab` 就好。
+
+## 結語
+
+透過 Tailscale，可以快速建立屬於自己的工作內網。整個過程不需要碰路由器設定、不需要固定 IP，也不需要維護一台 VPN 伺服器，對於租屋處或是被 CGNAT 擋住的環境特別實用。
+
+不論是一台筆電，還是未來逐步擴增到多台 server，都能以相同簡單的方式進行管理。這不僅適合個人開發者隨時遠端存取環境，也能讓團隊更輕鬆地串接彼此的資源。
