@@ -31,7 +31,9 @@ export const workExperiences: WorkExperience[] = [
     summary:
       'Working on...',
     bullets: [
-      'Working on...',
+      'Cross-Embodiment Representation: built a reusable data-processing and experimentation pipeline from AMASS datasets to compare humanoid models with different body proportions; extended Metamotivo-based control beyond a single embodiment.',
+      '2026 BEHAVIOR Challenge: built evaluation infrastructure spanning three servers with shared data and offline load balancing; classified force data, trained separate SFT checkpoints and introduced a stage classifier for RL post-training, improving both success rate and q-score by more than 10% over baseline.',
+      'x-LeRobot: built a 17-DoF mobile dual-arm platform with two SO-101 arms, a 2-DoF head, omnidirectional base and three cameras; trained a force-conditioned ACT policy and improved task success from 54% to 68%, then deployed it to Jetson Orin NX at 30 Hz with inference latency reduced from 62 ms to 19 ms.'
     ],
     image: '/images/workexperience/academia.png',
   },
@@ -72,9 +74,8 @@ export const workExperiences: WorkExperience[] = [
     summary:
       'Built backend services for a decentralized prediction market and automated smart-contract security checks.',
     bullets: [
-      'Developed backend services in Python for a decentralized prediction market, including market creation, order matching algorithm, oracle updates, and on-chain/off-chain integration.',
-      'Built automated n8n workflows with LLM for smart contract vulnerability checks, integrating static analysis tools and alerting pipelines to ensure system security.',
-      'Conducted research and produced analytical reports on various Web3 projects, including protocol architecture, tokenomics, security considerations, and potential use cases.',
+      'Developed front-end (React/TypeScript) and back-end (Python/FastAPI) features for the RiskMarket SaaS product, working in a distributed team with Git-based PR review and CI/CD.',
+      'Built backend services for a decentralised prediction market: smart-contract market creation, an O(log n) red-black-tree order-matching engine, and on-chain settlement of off-chain matched trades.'
     ],
     image: '/images/workexperience/aift.avif',
   },
@@ -89,8 +90,9 @@ export const workExperiences: WorkExperience[] = [
     summary:
       'Applied ML/DL models to predict asset returns and built an intraday high-frequency trading strategy.',
     bullets: [
-      'Applied a wide range of machine learning and deep learning models to predict asset returns. Successfully reduced computation time and improved accuracy through linear models, and further enhanced predictive performance using GNU-based neural network implementations.',
-      'Developed an intraday high-frequency trading strategy based on order flow imbalance and liquidity dynamics, achieving benchmark outperformance on GC futures in backtesting.',
+      'Traced out-of-sample degradation from added microstructure features to collinear order-book signals and leakage across overlapping return windows; rebuilt LassoCV with time-ordered walk-forward validation and purged boundaries, removing look-ahead leakage at lower training cost than the original k-fold pipeline.',
+      'Lifted out-of-sample R² from 0.013 to 0.014 on high-frequency return prediction with a tuned GRU model, evaluated under the corrected validation scheme.'
+
     ],
     image: '/images/workexperience/yuanta.jpg',
   },
