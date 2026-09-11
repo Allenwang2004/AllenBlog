@@ -178,11 +178,7 @@ const PostPage: NextPage<Props> = ({
       {/* 新增：若有 image 則顯示封面圖片 */}
       {image && (
         <div className="mb-6">
-          <img
-            src={image}
-            alt={title}
-            className="w-full max-h-96 object-cover rounded-lg shadow"
-          />
+          <img src={image} alt={title} className="w-full rounded-lg shadow" />
         </div>
       )}
 

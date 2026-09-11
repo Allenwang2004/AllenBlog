@@ -9,8 +9,10 @@ const CustomLink = ({ href, children, ...rest }: Props) => {
   const isAnchorLink = href && href.startsWith('#');
 
   if (isInternalLink) {
+    // Next's default: route changes go to the top of the new page, and a hash
+    // scrolls to its target. Suppressing that stranded readers mid-article.
     return (
-      <Link href={href} scroll={false}>
+      <Link href={href}>
         <a {...rest}>{children}</a>
       </Link>
     );
@@ -28,7 +30,7 @@ const CustomLink = ({ href, children, ...rest }: Props) => {
     <a target="_blank" rel="noopener noreferrer" href={href} {...rest}>
       {children}
       {typeof children === 'string' && (
-        <ExternalLinkIcon className="ml-1 inline-block h-4 w-4" />
+        <ExternalLinkIcon className="ml-1 inline-block size-4" />
       )}
     </a>
   );

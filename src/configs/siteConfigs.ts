@@ -4,9 +4,8 @@ const bannerPath = '/og-image.jpg';
 
 export const siteConfigs = {
   title: "Allen's Blog",
-  titleShort: 'Next Blog',
-  description:
-    "Allen's Blog",
+  titleShort: 'Allen Wang',
+  description: "Allen's Blog",
   author: 'Allenwang',
   credit: 'Allenwang',
   email: 'ziyiw1930@gmail.com',
