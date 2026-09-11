@@ -4,8 +4,6 @@ type Props = {
 
 export default function SectionContainer({ children }: Props) {
   return (
-    <div className="mx-auto max-w-full px-4 sm:px-6 md:max-w-3xl lg:max-w-5xl">
-      {children}
-    </div>
+    <div className="mx-auto w-full max-w-6xl px-5 sm:px-8">{children}</div>
   );
 }

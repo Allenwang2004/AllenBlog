@@ -5,15 +5,16 @@ import { useRouter } from 'next/router';
 const LanguageSwitch = () => {
   const router = useRouter();
   const { pathname, query } = router;
-  const nextLocale = router.locale === 'en' ? 'zh-TW' : 'en';
+  const isEnglish = router.locale === 'en';
+  const nextLocale = isEnglish ? 'zh-TW' : 'en';
 
   return (
     <Link locale={nextLocale} href={{ pathname, query }}>
       <a
         aria-label="Toggle Language"
-        className="rounded p-2 text-2xl leading-6 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 sm:p-3"
+        className="inline-flex h-10 items-center justify-center rounded-md px-3 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-900/[0.05] hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-50/[0.06] dark:hover:text-gray-50"
       >
-        {router.locale === 'en' ? '🇺🇸' : '🇹🇼'}
+        {isEnglish ? '中文' : 'EN'}
       </a>
     </Link>
   );

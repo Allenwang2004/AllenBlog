@@ -1,39 +1,34 @@
 import { useTranslation } from 'next-i18next';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import CustomLink from '@/components/CustomLink';
 import { headerConfigs } from '@/configs/headerConfigs';
 
 const MobileNav = () => {
   const { t } = useTranslation(['common']);
-
   const [navShow, setNavShow] = useState(false);
 
-  const onToggleNav = () => {
-    setNavShow((status) => {
-      if (status) {
-        document.body.style.overflowY = 'auto';
-      } else {
-        // Prevent scrolling
-        document.body.style.overflowY = 'hidden';
-      }
-      return !status;
-    });
-  };
+  useEffect(() => {
+    document.body.style.overflowY = navShow ? 'hidden' : 'auto';
+    return () => {
+      document.body.style.overflowY = 'auto';
+    };
+  }, [navShow]);
 
   return (
     <div className="sm:hidden">
       <button
         type="button"
-        className="h-10 w-10 rounded p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 sm:h-12 sm:w-12 sm:p-3"
+        className="inline-flex size-10 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-900/[0.05] hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-50/[0.06] dark:hover:text-gray-50"
         aria-label="Toggle Menu"
-        onClick={onToggleNav}
+        aria-expanded={navShow}
+        onClick={() => setNavShow((shown) => !shown)}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 20 20"
           fill="currentColor"
-          className="text-gray-900 transition-colors dark:text-gray-100"
+          className="size-5"
         >
           {navShow ? (
             <path
@@ -44,7 +39,7 @@ const MobileNav = () => {
           ) : (
             <path
               fillRule="evenodd"
-              d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+              d="M3 5.5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 14.5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
               clipRule="evenodd"
             />
           )}
@@ -52,17 +47,17 @@ const MobileNav = () => {
       </button>
 
       <div
-        className={`fixed top-16 right-0 h-screen w-full bg-gray-200/90 transition-all duration-300 ease-in-out dark:bg-gray-800/90 ${
+        className={`fixed inset-x-0 bottom-0 top-[4.5rem] z-20 border-t border-gray-200 bg-paper transition-transform duration-300 ease-out dark:border-gray-800 dark:bg-gray-900 ${
           navShow ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        <nav className="mt-8 h-full w-full">
+        <nav className="px-5 py-4">
           {headerConfigs.navLinks.map((link) => (
             <CustomLink
               href={link.href}
               key={link.title}
-              className="block px-12 py-4 text-2xl font-bold tracking-widest text-gray-900 transition-colors hover:bg-gray-300 dark:text-gray-100 dark:hover:bg-gray-700"
-              onClick={onToggleNav}
+              className="display-tight block border-b border-gray-200 py-5 text-2xl font-semibold text-gray-900 transition-colors hover:text-primary-600 dark:border-gray-800 dark:text-gray-50 dark:hover:text-primary-400"
+              onClick={() => setNavShow(false)}
             >
               {t(link.title)}
             </CustomLink>
