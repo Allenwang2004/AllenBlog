@@ -4,12 +4,13 @@ import { ArticleJsonLd, NextSeo } from 'next-seo';
 
 import LayoutPerPage from '@/components/LayoutPerPage';
 import ResumeContent from '@/components/ResumeContent';
+import { DEFAULT_LOCALE } from '@/configs/i18nConfigs';
 import { siteConfigs } from '@/configs/siteConfigs';
 
 export const getStaticProps: GetStaticProps = async ({ locale }) => {
   return {
     props: {
-      ...(await serverSideTranslations(locale ?? 'zh-TW', ['common'])),
+      ...(await serverSideTranslations(locale ?? DEFAULT_LOCALE, ['common'])),
     },
   };
 };
