@@ -8,7 +8,7 @@ A personal blog / resume site built with Next.js 12 and Contentlayer. Content is
 - **Content**: [Contentlayer](https://www.contentlayer.dev/) — compiles `content/posts/*.mdx` into typed `Post` objects at build time
 - **Styling**: Tailwind CSS (`@tailwindcss/typography` for article typography, `next-themes` for dark mode)
 - **i18n**: `next-i18next` (UI copy) + Next.js's built-in `i18n` routing (`en` / `zh-TW`)
-- **Other**: `kbar` (command palette / search), `@giscus/react` (comments), `resend` (email subscribe API), `next-sitemap`, RSS/Atom/JSON feed generation
+- **Other**: `kbar` (command palette / search), `resend` (email subscribe API), `next-sitemap`, RSS/Atom/JSON feed generation
 
 ## Directory Structure
 
