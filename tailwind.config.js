@@ -1,5 +1,12 @@
 const defaultTheme = require('tailwindcss/defaultTheme');
-const colors = require('tailwindcss/colors');
+
+/**
+ * Design system: "Verdigris & Drafting Paper"
+ *
+ * The ground is cool drafting paper, the ink is a petrol-tinted carbon, and the
+ * one signal colour is verdigris — oxidised copper, the colour instrument
+ * housings go. Brass is reserved for a single state: something that is live.
+ */
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -14,11 +21,63 @@ module.exports = {
         14: '3.5rem',
       },
       fontFamily: {
-        sans: ['InterVariable', ...defaultTheme.fontFamily.sans],
+        sans: ['Archivo', ...defaultTheme.fontFamily.sans],
+        serif: ['"Source Serif 4"', ...defaultTheme.fontFamily.serif],
+        mono: ['"IBM Plex Mono"', ...defaultTheme.fontFamily.mono],
       },
       colors: {
-        primary: colors.red,
-        gray: colors.neutral,
+        // Page grounds
+        paper: '#ECEEE9',
+        surface: '#F7F8F4',
+
+        // Petrol-tinted slate: replaces Tailwind's neutral everywhere at once.
+        gray: {
+          50: '#F4F6F4',
+          100: '#E6EAE8',
+          200: '#D1D8D6',
+          300: '#B1BBB9',
+          400: '#8C9795',
+          500: '#6D7978',
+          600: '#4C5857',
+          700: '#333E3D',
+          800: '#1B2625',
+          900: '#101A19',
+          950: '#080F0E',
+        },
+
+        // Verdigris — the single signal colour.
+        primary: {
+          50: '#EDF6F3',
+          100: '#D3E9E2',
+          200: '#A8D3C6',
+          300: '#75B9A7',
+          400: '#4B9E88',
+          500: '#2F8570',
+          600: '#1F6F5C',
+          700: '#185848',
+          800: '#144639',
+          900: '#11382E',
+          950: '#0A2019',
+        },
+
+        // Brass — used only to mark something that is currently live.
+        brass: {
+          100: '#F2E7CE',
+          300: '#D9B970',
+          500: '#A9782B',
+          600: '#8A6020',
+          900: '#3B2A0E',
+        },
+      },
+      letterSpacing: {
+        display: '-0.035em',
+      },
+      maxWidth: {
+        measure: '68ch',
+      },
+      boxShadow: {
+        // A single, low, colour-matched lift. No generic rgba(0,0,0,.1) drop.
+        lift: '0 1px 2px rgba(16, 26, 25, 0.04), 0 8px 24px -12px rgba(16, 26, 25, 0.18)',
       },
       typography: (theme) => ({
         DEFAULT: {
@@ -153,7 +212,5 @@ module.exports = {
       }),
     },
   },
-  plugins: [
-    require('@tailwindcss/typography'),
-  ],
+  plugins: [require('@tailwindcss/typography')],
 };

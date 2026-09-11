@@ -2,6 +2,78 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    /* Ruled drafting-paper texture. Two hairlines, almost subliminal. */
+    --rule: rgba(16, 26, 25, 0.045);
+    --rule-strong: rgba(16, 26, 25, 0.08);
+  }
+
+  .dark {
+    --rule: rgba(177, 187, 185, 0.05);
+    --rule-strong: rgba(177, 187, 185, 0.09);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    /* Clear the sticky header when jumping to an anchor. */
+    scroll-padding-top: 5.5rem;
+  }
+
+  body {
+    font-feature-settings: 'kern' 1;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Numbers are measurements here — keep them in columns. */
+  time,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background-color: theme('colors.primary.200');
+    color: theme('colors.primary.900');
+  }
+
+  .dark ::selection {
+    background-color: theme('colors.primary.800');
+    color: theme('colors.primary.100');
+  }
+
+  /* One focus treatment for the whole site. */
+  :focus-visible {
+    outline: 2px solid theme('colors.primary.500');
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+@layer components {
+  /* Archivo carries a width axis; the wordmark and display type use it as a
+     graphic property rather than reaching for extra weight. */
+  .display {
+    font-stretch: 116%;
+    letter-spacing: -0.035em;
+    line-height: 0.92;
+  }
+
+  .display-tight {
+    letter-spacing: -0.022em;
+  }
+
+  /* The drafting grid behind the kinematic figure. */
+  .drafting-grid {
+    background-image: linear-gradient(to right, var(--rule) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--rule) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  .hairline {
+    border-color: var(--rule-strong);
+  }
+}
+
 /* Full-screen section snapping on the homepage only (toggled via a class on
    <html> in src/pages/index.tsx). scroll-snap-type must live on the actual
    scrolling element, which for a normal document-flow page is <html>. */
@@ -11,4 +83,40 @@ html.home-scroll-snap {
 
 .snap-section {
   scroll-snap-align: start;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  html.home-scroll-snap {
+    scroll-snap-type: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Disclosure panels animate from their real height rather than a guessed max. */
+.disclosure {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.28s ease, opacity 0.28s ease;
+}
+
+.disclosure > * {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.disclosure.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
 }
