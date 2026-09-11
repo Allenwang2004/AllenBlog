@@ -46,9 +46,17 @@ const MobileNav = () => {
         </svg>
       </button>
 
+      {/* Positioned against the sticky header rather than `fixed`: the
+          header's backdrop-filter makes it the containing block for fixed
+          descendants, which collapsed this panel to a 1px strip. Closed, it
+          drops a few px up behind the header and fades — a slide off to the
+          right kept widening the document so phones could pan sideways. */}
       <div
-        className={`fixed inset-x-0 bottom-0 top-[4.5rem] z-20 border-t border-gray-200 bg-paper transition-transform duration-300 ease-out dark:border-gray-800 dark:bg-gray-900 ${
-          navShow ? 'translate-x-0' : 'translate-x-full'
+        aria-hidden={!navShow}
+        className={`absolute inset-x-0 top-full z-20 h-[calc(100vh-4.5rem)] border-t border-gray-200 bg-paper transition-[transform,opacity,visibility] duration-200 ease-out supports-[height:100dvh]:h-[calc(100dvh-4.5rem)] dark:border-gray-800 dark:bg-gray-900 ${
+          navShow
+            ? 'visible translate-y-0 opacity-100'
+            : 'invisible -translate-y-2 opacity-0'
         }`}
       >
         <nav className="px-5 py-4">
