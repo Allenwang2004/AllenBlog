@@ -176,9 +176,15 @@ const PostPage: NextPage<Props> = ({
       />
 
       {/* 新增：若有 image 則顯示封面圖片 */}
+      {/* Height is capped so a tall cover can't push the title below the
+          fold; the image scales down uncropped and centres. */}
       {image && (
-        <div className="mb-6">
-          <img src={image} alt={title} className="w-full rounded-lg shadow" />
+        <div className="mx-auto mb-6 max-w-4xl pt-8">
+          <img
+            src={image}
+            alt={title}
+            className="mx-auto max-h-[26rem] w-auto rounded-lg shadow"
+          />
         </div>
       )}
 
