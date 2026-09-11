@@ -1,154 +1,174 @@
-import { ChevronDownIcon } from '@heroicons/react/24/outline';
+import Image from 'next/image';
 import { useState } from 'react';
 
 import CustomLink from '@/components/CustomLink';
+import SectionHeading from '@/components/SectionHeading';
 import { workExperiences } from '@/configs/workExperienceConfigs';
 
+/**
+ * The roles are genuinely a sequence, so they get a timeline rail. Joint
+ * markers on the rail echo the linkage in Fig. 1.
+ */
 const WorkExperienceSection = () => {
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(
+    workExperiences[0]?.id ?? null
+  );
 
   return (
-    <div className="my-10">
-      <style>{`
-        .work-exp-content {
-          max-height: 0;
-          opacity: 0;
-          overflow: hidden;
-          transition: max-height 0.25s ease-in-out, opacity 0.25s ease-in-out;
-        }
-        .work-exp-content.open {
-          max-height: 1000px;
-          opacity: 1;
-        }
-      `}</style>
+    <section id="work" className="py-8">
+      <SectionHeading title="Work" />
 
-      <div className="prose prose-lg dark:prose-dark">
-        <h2>Work Experience</h2>
-      </div>
-
-      <div className="mt-4 divide-y divide-gray-100 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm shadow-gray-200/60 dark:divide-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
-        {workExperiences.map((exp) => {
+      <ol className="mt-12">
+        {workExperiences.map((exp, index) => {
           const isOpen = openId === exp.id;
+          const isLast = index === workExperiences.length - 1;
+          const tileRadius =
+            exp.logoShape === 'circle' ? 'rounded-full' : 'rounded-lg';
 
           return (
-            <div key={exp.id}>
-              <button
-                type="button"
-                onClick={() => setOpenId(isOpen ? null : exp.id)}
-                aria-expanded={isOpen}
-                className={`group flex w-full items-center gap-4 px-5 py-5 text-left transition-colors sm:px-7 ${
-                  isOpen
-                    ? 'bg-gray-50 dark:bg-gray-800/60'
-                    : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'
+            <li
+              key={exp.id}
+              className="grid gap-x-10 lg:grid-cols-[8.5rem_1fr]"
+            >
+              <p className="tabular hidden pt-8 font-mono text-sm leading-6 text-gray-500 dark:text-gray-400 lg:block">
+                {exp.period}
+              </p>
+
+              <div
+                className={`relative pl-8 ${
+                  isLast
+                    ? 'pb-2'
+                    : 'border-l border-gray-200 pb-2 dark:border-gray-800'
                 }`}
               >
-                <div className="h-28 w-40 shrink-0 flex items-center justify-center">
-                  {exp.image ? (
-                    <img
-                      src={exp.image}
-                      alt={exp.company}
-                      className={`shadow-md ring-1 ring-black/5 transition-transform duration-200 group-hover:scale-105 ${
-                        exp.id === 'tymphany'
-                          ? 'h-22 w-33 object-contain rounded-2xl'
-                          : exp.id === 'aift'
-                            ? 'h-20 w-30 object-contain rounded-2xl'
-                            : exp.id === 'academia'
-                              ? 'h-28 w-28 object-cover rounded-full'
-                              : 'h-28 w-28 object-cover rounded-2xl'
-                      }`}
-                    />
-                  ) : (
-                    <span
-                      className={`flex h-28 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-md ring-1 ring-black/5 transition-transform duration-200 group-hover:scale-105 ${
-                        exp.id === 'tymphany' || exp.id === 'aift' ? 'w-40' : 'w-28'
-                      } ${exp.color}`}
-                    >
-                      {exp.logo}
-                    </span>
-                  )}
-                </div>
+                <h3 className="sr-only">
+                  {exp.role}, {exp.company}
+                </h3>
 
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="font-semibold text-gray-900 dark:text-gray-100">
-                      {exp.role}
-                    </span>
-                    <span className="text-gray-400">·</span>
-                    <span className="font-medium text-gray-500 dark:text-gray-400">
-                      {exp.company}
-                    </span>
-                    {exp.current && (
-                      <span className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                        Current
+                <button
+                  type="button"
+                  onClick={() => setOpenId(isOpen ? null : exp.id)}
+                  aria-expanded={isOpen}
+                  className="group relative flex w-full items-center gap-5 rounded-md py-7 text-left"
+                >
+                  {isLast && (
+                    <span
+                      aria-hidden
+                      className="absolute left-[-32px] top-0 h-1/2 w-px bg-gray-200 dark:bg-gray-800"
+                    />
+                  )}
+
+                  {/* Joint marker: inked ring over a paper core. */}
+                  <span
+                    aria-hidden
+                    className={`absolute left-[-37.5px] top-1/2 size-[11px] -translate-y-1/2 rounded-full border-2 bg-paper transition-colors dark:bg-gray-900 ${
+                      exp.current
+                        ? 'border-brass-500'
+                        : 'border-gray-400 dark:border-gray-600'
+                    }`}
+                  />
+                  <span
+                    className={`relative flex size-20 shrink-0 items-center justify-center overflow-hidden bg-surface ring-1 ring-gray-900/[0.07] transition-shadow group-hover:ring-gray-900/20 dark:bg-gray-800 dark:ring-gray-50/10 dark:group-hover:ring-gray-50/25 sm:size-28 ${tileRadius}`}
+                    style={
+                      exp.logoBg ? { backgroundColor: exp.logoBg } : undefined
+                    }
+                  >
+                    {exp.image ? (
+                      <Image
+                        src={exp.image}
+                        alt=""
+                        layout="fill"
+                        objectFit={exp.logoBg ? 'contain' : 'cover'}
+                        sizes="112px"
+                      />
+                    ) : (
+                      <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">
+                        {exp.logo}
                       </span>
                     )}
                   </span>
-                </span>
 
-                <span className="hidden shrink-0 whitespace-nowrap rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400 sm:inline-block">
-                  {exp.period}
-                </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                      <span className="font-serif text-[1.375rem] font-semibold leading-tight text-gray-700 decoration-primary-500/50 underline-offset-4 group-hover:underline dark:text-gray-200 sm:text-2xl">
+                        {exp.role}
+                      </span>
+                      <span className="text-base text-gray-500 dark:text-gray-400 sm:text-lg">
+                        {exp.company}
+                      </span>
+                      {exp.current && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-brass-100 px-2.5 py-0.5 text-xs font-medium text-brass-600 dark:bg-brass-900/60 dark:text-brass-300">
+                          <span className="size-1.5 rounded-full bg-brass-500" />
+                          Current
+                        </span>
+                      )}
+                    </span>
 
-                <ChevronDownIcon
-                  className={`h-4 w-4 shrink-0 rounded-full text-gray-400 transition-transform duration-200 ${
-                    isOpen ? 'rotate-180' : ''
-                  }`}
-                />
-              </button>
+                    <span className="tabular mt-2 block font-mono text-sm text-gray-500 dark:text-gray-400 lg:hidden">
+                      {exp.period}
+                    </span>
+                  </span>
 
-              <div
-                className={`work-exp-content ${isOpen ? 'open' : ''} bg-gray-50 dark:bg-gray-800/60`}
-              >
-                <div className="px-5 pb-6 pt-1 sm:px-7">
-                  <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-400 sm:hidden">
-                    {exp.period}
-                  </p>
-                  <p className="mb-4 text-sm text-gray-400">
-                    {exp.location}
-                  </p>
-                  <ul className="space-y-3 border-l-2 border-primary-200 pl-4 dark:border-primary-900">
-                    {exp.bullets.map((bullet) => (
-                      <li
-                        key={bullet}
-                        className="text-sm leading-relaxed text-gray-600 dark:text-gray-300"
-                      >
-                        {bullet}
-                      </li>
-                    ))}
-                  </ul>
+                  <span className="shrink-0 self-center text-sm font-medium text-gray-400 transition-colors group-hover:text-gray-700 dark:group-hover:text-gray-200">
+                    {isOpen ? 'Less' : 'More'}
+                  </span>
+                </button>
 
-                  {exp.link && (
-                    <CustomLink
-                      href={exp.link.href}
-                      className="group mt-5 flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-3 transition-shadow hover:shadow-lg dark:border-gray-700 dark:bg-gray-900"
-                    >
-                      <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
-                        {(exp.link.image ?? exp.image) && (
-                          <img
-                            src={exp.link.image ?? exp.image}
-                            alt={exp.link.title}
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-gray-900 group-hover:text-primary-500 dark:text-gray-100">
-                          {exp.link.title}
-                        </p>
-                        <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
-                          {exp.link.description}
-                        </p>
-                      </div>
-                    </CustomLink>
-                  )}
+                <div className={`disclosure ${isOpen ? 'open' : ''}`}>
+                  <div>
+                    <div className="pb-8 sm:pl-32">
+                      <p className="font-mono text-sm text-gray-500 dark:text-gray-400">
+                        {exp.location}
+                      </p>
+
+                      <ul className="mt-5 max-w-measure space-y-4">
+                        {exp.bullets.map((bullet) => (
+                          <li
+                            key={bullet}
+                            className="relative pl-6 font-serif text-[17px] leading-relaxed text-gray-700 dark:text-gray-300"
+                          >
+                            <span
+                              aria-hidden
+                              className="absolute left-0 top-[0.7em] h-px w-3 bg-primary-500"
+                            />
+                            {bullet}
+                          </li>
+                        ))}
+                      </ul>
+
+                      {exp.link && (
+                        <CustomLink
+                          href={exp.link.href}
+                          className="group/link mt-7 flex max-w-measure items-center gap-4 rounded-lg border border-gray-200 bg-surface p-3 transition-colors hover:border-gray-400 dark:border-gray-800 dark:bg-gray-800/50 dark:hover:border-gray-600"
+                        >
+                          <span className="h-20 w-28 shrink-0 overflow-hidden rounded-md bg-gray-100 dark:bg-gray-900">
+                            {(exp.link.image ?? exp.image) && (
+                              <img
+                                src={exp.link.image ?? exp.image}
+                                alt=""
+                                className="size-full object-cover"
+                              />
+                            )}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-base font-semibold text-gray-900 group-hover/link:text-primary-600 dark:text-gray-100 dark:group-hover/link:text-primary-400">
+                              {exp.link.title}
+                            </span>
+                            <span className="mt-1 line-clamp-2 block text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                              {exp.link.description}
+                            </span>
+                          </span>
+                        </CustomLink>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </li>
           );
         })}
-      </div>
-    </div>
+      </ol>
+    </section>
   );
 };
 

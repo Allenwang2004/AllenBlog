@@ -1,14 +1,25 @@
+import SectionHeading from '@/components/SectionHeading';
+
 const ResumeContent = () => {
   return (
-    <div className="prose prose-lg mx-auto my-16 text-center dark:prose-dark px-4 max-w-4xl">
-      <h1>Experience</h1>
+    <div className="py-16">
+      <SectionHeading
+        title="Résumé"
+        action={
+          <a
+            href="/resume.pdf"
+            download
+            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 transition-colors hover:border-gray-900 hover:bg-gray-900/[0.04] dark:border-gray-700 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-50/[0.04]"
+          >
+            Download PDF
+          </a>
+        }
+      />
 
-      <div className="mt-12 w-full max-w-5xl mx-auto">
+      <div className="mt-10 overflow-hidden rounded-lg border border-gray-200 bg-surface transition-colors dark:border-gray-800 dark:bg-gray-800/40">
         <iframe
           src="/resume.pdf"
-          width="100%"
-          height="800px"
-          className="border rounded shadow-md"
+          className="block h-[80vh] min-h-[560px] w-full"
           title="Resume PDF"
         />
       </div>
