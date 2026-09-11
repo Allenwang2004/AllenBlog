@@ -14,7 +14,7 @@ export default function Footer() {
   return (
     <footer className="mt-24 border-t border-gray-200 transition-colors dark:border-gray-800">
       <SectionContainer>
-        <div className="grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-12">
+        <div className="grid gap-10 pb-20 pt-14 sm:grid-cols-2 lg:grid-cols-12">
           <div className="lg:col-span-6">
             <div className="flex items-center gap-2.5">
               <LinkageMark className="size-5 text-primary-600 dark:text-primary-400" />
@@ -71,7 +71,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 py-6 transition-colors dark:border-gray-800">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 py-8 transition-colors dark:border-gray-800">
           <p className="tabular font-mono text-sm text-gray-400 dark:text-gray-500">
             {`© 2015–${new Date().getFullYear()} ${footerConfigs.credit}`}
           </p>

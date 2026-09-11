@@ -32,8 +32,8 @@ export default function HeroSection() {
 
   return (
     <div className="py-16 lg:py-20">
-      <div className="grid items-center gap-x-14 gap-y-12 lg:grid-cols-12">
-        <div className="lg:col-span-7">
+      <div className="grid items-center gap-x-10 gap-y-12 md:grid-cols-12 lg:gap-x-14">
+        <div className="md:col-span-7">
           <p className="text-xl font-medium text-gray-500 dark:text-gray-400">
             HI, I AM
           </p>
@@ -76,8 +76,8 @@ export default function HeroSection() {
           </div>
         </div>
 
-        <div className="lg:col-span-5">
-          <figure className="m-0 mx-auto w-full max-w-[22rem] lg:max-w-[26rem]">
+        <div className="md:col-span-5">
+          <figure className="m-0 w-full max-w-[22rem] md:mx-auto lg:max-w-[26rem]">
             <div className="relative">
               <div className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-gray-100 ring-1 ring-gray-900/10 dark:bg-gray-800 dark:ring-gray-50/10">
                 <Image

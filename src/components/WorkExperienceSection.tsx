@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 
@@ -26,11 +27,10 @@ const WorkExperienceSection = () => {
             exp.logoShape === 'circle' ? 'rounded-full' : 'rounded-lg';
 
           return (
-            <li
-              key={exp.id}
-              className="grid gap-x-10 lg:grid-cols-[8.5rem_1fr]"
-            >
-              <p className="tabular hidden pt-8 font-mono text-sm leading-6 text-gray-500 dark:text-gray-400 lg:block">
+            <li key={exp.id} className="grid gap-x-10 lg:grid-cols-[11rem_1fr]">
+              {/* Same box as the logo tile (py-7 + size-24), so the period
+                  sits level with the joint marker and the role. */}
+              <p className="tabular hidden whitespace-nowrap font-mono text-sm text-gray-500 dark:text-gray-400 lg:mt-7 lg:flex lg:h-24 lg:items-center">
                 {exp.period}
               </p>
 
@@ -49,7 +49,7 @@ const WorkExperienceSection = () => {
                   type="button"
                   onClick={() => setOpenId(isOpen ? null : exp.id)}
                   aria-expanded={isOpen}
-                  className="group relative flex w-full items-center gap-5 rounded-md py-7 text-left"
+                  className="group relative flex w-full items-center gap-4 rounded-md py-7 text-left sm:gap-5"
                 >
                   {isLast && (
                     <span
@@ -68,7 +68,7 @@ const WorkExperienceSection = () => {
                     }`}
                   />
                   <span
-                    className={`relative flex size-20 shrink-0 items-center justify-center overflow-hidden bg-surface ring-1 ring-gray-900/[0.07] transition-shadow group-hover:ring-gray-900/20 dark:bg-gray-800 dark:ring-gray-50/10 dark:group-hover:ring-gray-50/25 sm:size-28 ${tileRadius}`}
+                    className={`relative flex size-16 shrink-0 items-center justify-center overflow-hidden bg-surface ring-1 ring-gray-900/[0.07] transition-shadow group-hover:ring-gray-900/20 dark:bg-gray-800 dark:ring-gray-50/10 dark:group-hover:ring-gray-50/25 sm:size-24 ${tileRadius}`}
                     style={
                       exp.logoBg ? { backgroundColor: exp.logoBg } : undefined
                     }
@@ -79,7 +79,7 @@ const WorkExperienceSection = () => {
                         alt=""
                         layout="fill"
                         objectFit={exp.logoBg ? 'contain' : 'cover'}
-                        sizes="112px"
+                        sizes="96px"
                       />
                     ) : (
                       <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">
@@ -90,7 +90,7 @@ const WorkExperienceSection = () => {
 
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                      <span className="font-serif text-[1.375rem] font-semibold leading-tight text-gray-700 decoration-primary-500/50 underline-offset-4 group-hover:underline dark:text-gray-200 sm:text-2xl">
+                      <span className="font-serif text-xl font-semibold leading-tight text-gray-700 decoration-primary-500/50 underline-offset-4 group-hover:underline dark:text-gray-200 sm:text-2xl">
                         {exp.role}
                       </span>
                       <span className="text-base text-gray-500 dark:text-gray-400 sm:text-lg">
@@ -109,14 +109,22 @@ const WorkExperienceSection = () => {
                     </span>
                   </span>
 
-                  <span className="shrink-0 self-center text-sm font-medium text-gray-400 transition-colors group-hover:text-gray-700 dark:group-hover:text-gray-200">
-                    {isOpen ? 'Less' : 'More'}
+                  <span className="flex shrink-0 items-center gap-1 self-center text-sm font-medium text-gray-400 transition-colors group-hover:text-gray-700 dark:group-hover:text-gray-200">
+                    <span className="hidden sm:inline">
+                      {isOpen ? 'Less' : 'More'}
+                    </span>
+                    <ChevronDown
+                      aria-hidden
+                      className={`size-4 transition-transform duration-300 ${
+                        isOpen ? 'rotate-180' : ''
+                      }`}
+                    />
                   </span>
                 </button>
 
                 <div className={`disclosure ${isOpen ? 'open' : ''}`}>
                   <div>
-                    <div className="pb-8 sm:pl-32">
+                    <div className="pb-8 sm:pl-[7.25rem]">
                       <p className="font-mono text-sm text-gray-500 dark:text-gray-400">
                         {exp.location}
                       </p>

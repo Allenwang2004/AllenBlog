@@ -137,9 +137,9 @@ export default function PostList({ posts = [], lead = false }: Props) {
               <div className="flex items-center gap-3 sm:block">
                 <time
                   dateTime={post.date}
-                  className="block font-mono text-sm text-gray-500 dark:text-gray-400"
+                  className="block whitespace-nowrap font-mono text-sm text-gray-500 dark:text-gray-400"
                 >
-                  {formatDate(post.date, locale)}
+                  {formatDate(post.date, locale, 'short')}
                 </time>
                 <span className="sm:mt-1 sm:block">
                   <LanguageTag language={post.language} />

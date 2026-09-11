@@ -3,7 +3,6 @@ import { GetStaticProps } from 'next';
 import { useTranslation } from 'next-i18next';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import { ArticleJsonLd } from 'next-seo';
-import { useEffect } from 'react';
 
 import {
   getCommandPalettePosts,
@@ -59,11 +58,6 @@ const POSTS_PER_PAGE = 6;
 const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
   const { t } = useTranslation(['indexPage', 'common']);
 
-  useEffect(() => {
-    document.documentElement.classList.add('home-scroll-snap');
-    return () => document.documentElement.classList.remove('home-scroll-snap');
-  }, []);
-
   useCommandPalettePostActions(commandPalettePosts);
 
   const pagedPosts = posts.slice(0, POSTS_PER_PAGE);
@@ -81,15 +75,13 @@ const Home: NextPage<Props> = ({ posts, commandPalettePosts }) => {
         description={siteConfigs.description}
       />
 
-      <section className="snap-section">
+      <section>
         <HeroSection />
       </section>
 
-      <div className="snap-section">
-        <WorkExperienceSection />
-      </div>
+      <WorkExperienceSection />
 
-      <section id="writing" className="scroll-mt-24 py-16">
+      <section id="writing" className="py-16">
         <SectionHeading
           title={t('latest-posts')}
           description={t('latest-posts-desc')}
