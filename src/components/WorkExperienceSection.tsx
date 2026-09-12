@@ -93,9 +93,6 @@ const WorkExperienceSection = () => {
                       <span className="font-serif text-xl font-semibold leading-tight text-gray-700 decoration-primary-500/50 underline-offset-4 group-hover:underline dark:text-gray-200 sm:text-2xl">
                         {exp.role}
                       </span>
-                      <span className="text-base text-gray-500 dark:text-gray-400 sm:text-lg">
-                        {exp.company}
-                      </span>
                       {exp.current && (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-brass-100 px-2.5 py-0.5 text-xs font-medium text-brass-600 dark:bg-brass-900/60 dark:text-brass-300">
                           <span className="size-1.5 rounded-full bg-brass-500" />
