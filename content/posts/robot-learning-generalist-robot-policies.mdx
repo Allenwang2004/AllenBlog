@@ -1,0 +1,419 @@
+---
+title: Robot Learning - Generalist Robot Policies
+description: "Class notes from ETH Zürich's Robot Learning: From Fundamentals to Foundation Models — generalist robot policies, from Octo and CrossFormer to VLAs like OpenVLA and π0."
+descriptionEn: "Class notes from ETH Zürich's Robot Learning: From Fundamentals to Foundation Models — generalist robot policies, from Octo and CrossFormer to VLAs like OpenVLA and π0."
+slug: robot-learning-generalist-robot-policies-post
+date: 2026-09-14
+type: Post
+image: /images/robot_learning.png
+language: en
+---
+
+These are my notes from the *Generalist Robot Policies* lecture of [**Robot Learning: From Fundamentals to Foundation Models**](https://video.ethz.ch/lectures/d-infk/2026/spring/263-5911-00L) (ETH Zürich, 263-5911-00L, Spring 2026, taught by Oier Mees). The lecture starts from one question — can a single policy work for *any task, any robot, any environment?* — and then walks through what it actually takes to get there: pooling datasets across labs, architectures such as Octo and CrossFormer that treat robotics as sequence modeling, vision-language-action models (VLAs) that reuse internet-scale priors, and the unglamorous engineering (action-space alignment, batching, dataloading, evaluation) that decides whether any of it works.
+
+The slides below are from the lecture. Wherever a slide is drawn from a paper, the paper is linked right under it.
+
+## Problem Statement: Specialist Policies Don't Scale
+
+Until recently, most of robot learning produced **specialist models**: one policy for one task, on one robot, in one lab. Every new task means a new round of data collection and a new training run, and nothing carries over from the last one. That is the core problem — it simply doesn't scale.
+
+The contrast the lecture draws is with NLP. Foundation models trained on large datasets already handle code completion, question answering, translation and much more, and a single foundation model now beats most specialist models at their own game. The thesis of the lecture is that robotics should follow the same path.
+
+## Goal: A Generalist Robot Policy
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/Screenshot_2026-07-14_at_12.54.07_PM.png"
+  alt="Large Robot Dataset → Robot Foundation Model → Any Task, Any Robot, Any Environment"
+  width={593}
+  height={247}
+/>
+
+The picture is deliberately simple: a **large robot dataset** feeds a **robot foundation model**, which should then work for *any task, any robot, any environment*. The two questions written above the arrows structure the rest of the lecture:
+
+1. **Where do we get this data from?**
+2. **How can we model the data distribution?**
+
+## The Ingredients — and Why Each One Is Hard
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/dceb734f-4bec-4bbb-aba1-5aec3c8b78ca.png"
+  alt="Large Datasets, Large Models, Scalable Evaluation — and the difficulties of each"
+  width={552}
+  height={271}
+/>
+
+The recipe has three ingredients, and each comes with a robotics-specific obstacle:
+
+- **Large datasets.** Robot data is **scarce**. Unlike text or images, there is no internet to scrape; collecting demonstrations requires **human supervision** (teleoperation), one trajectory at a time.
+- **Large models.** Robot data is **multimodal and heterogeneous** — cameras, language, proprioception, different robots with different action spaces. On top of that, robots need **high-frequency control**, so inference has to run in real time, which is not something a chatbot has to worry about.
+- **Scalable evaluation.** Robot evals are **tedious and expensive**: every trial is a physical rollout. They are also **difficult to reproduce** across labs, because no two setups are identical.
+
+The lecture takes each of the three in turn.
+
+## Fixing the Data Problem: Pool What Already Exists
+
+**Key idea: leverage existing robot datasets.** Many labs have spent years collecting their own data. Individually each dataset is small; collectively they are not. The obvious move is to collect all of them into one.
+
+That is what the **Open X-Embodiment (OXE)** project did — an open collaboration that pooled 60 datasets covering 22 robot embodiments from more than 20 institutions into a single standardized format. The paper also delivered the empirical justification for the whole program: the **RT-X** models trained on the pooled data outperformed both each lab's own original method and the same architecture trained on that lab's data alone. In other words, there is *positive transfer* across robots and labs — a foundation-model-style approach really does beat the old one-dataset-per-model approach.
+
+Paper: [Open X-Embodiment: Robotic Learning Datasets and RT-X Models](https://arxiv.org/abs/2310.08864)
+
+## Fixing the Model Problem
+
+Once the data is pooled, the model has to cope with three kinds of "new" that a specialist policy never faces:
+
+1. **New task specification** — a language instruction or a goal image instead of a fixed task ID.
+2. **New observation space** — for example a different number of cameras, or a new sensor.
+3. **New action space** — a different robot, or a different controller on the same robot.
+
+### Method 1: Robotics as Multimodal Sequence Modeling
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/Screenshot_2026-07-14_at_1.10.36_PM.png"
+  alt="Language, image and action all turned into tokens"
+  width={620}
+  height={307}
+/>
+
+The first approach turns *everything* into a sequence problem and solves it by "token continuation," the same way a language model does. The instruction "Pick up the spoon" becomes language tokens, the camera frame becomes image patch tokens, and the action $[\Delta x, \Delta\theta, \Delta\text{Grip}]$ becomes action tokens. A single transformer then models the joint sequence. The appeal is that adding a modality is just adding another group of tokens.
+
+### Example: Octo, an Open-Source Generalist Policy
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/Screenshot_2026-09-14_at_12.37.08_PM.png"
+  alt="Octo architecture: task tokens, observation tokens and readout tokens through the Octo Transformer, then an action head"
+  width={640}
+  height={316}
+/>
+
+Paper: [Octo: An Open-Source Generalist Robot Policy](https://arxiv.org/abs/2405.12213) (Octo Model Team, RSS 2024)
+
+Octo is goal-conditioned behavior cloning, $\pi_\theta(a_t \mid s_t, s_g)$, where the goal $s_g$ is either a goal image or a language instruction. It was pretrained on 800k trajectories from 25 OXE datasets and comes in two sizes, Octo-Small (27M parameters) and Octo-Base (93M). Three design decisions are worth going through in detail, because they are what make the "generalist" claim hold up.
+
+#### Design point 1: block-wise causal attention
+
+The purpose of this structure is that you can **freely add or remove input groups without breaking the pretrained architecture**, and the readout can be attached to different action heads depending on the robot.
+
+The input sequence is split into three kinds of block:
+
+- **Task tokens** — the language instruction's tokens, or the goal image's patch tokens.
+- **Observation tokens** $O_t$ — the image patch tokens plus the proprioception token for each timestep.
+- **Readout tokens** $R_t$ — a learnable token inserted at every timestep, similar to `[CLS]`, whose output is fed to a diffusion action head to produce the action.
+
+"Block-wise causal" means the **mask is defined per group, not per token**. Inside a group attention is fully bidirectional (all image patches of the same frame see each other); the causal constraint only applies *between* groups, and it runs along the time axis:
+
+| Attending token | Can see |
+| --- | --- |
+| Task | Only other task tokens (never observations) |
+| $O_t$ | Task + $O_{\le t}$ |
+| $R_t$ | Task + $O_{\le t}$; but **nothing attends to readouts** |
+
+The last row is the important one. Readouts are passive readers: they never change the representation of the task or observation tokens. That is exactly why a new readout and a new action head can be bolted on at fine-tuning time without disturbing what the pretrained tokens compute.
+
+#### Design point 2: put the capacity in the transformer, keep the tokenizer shallow
+
+Octo **concentrates parameters and compute in the transformer, and leaves the image tokenizer as a very shallow CNN.** To see why this matters, compare it with what came before.
+
+**The baseline.** Take RT-1: the body is an EfficientNet-B3, language is injected into the CNN's intermediate layers via FiLM, the CNN outputs 81 tokens which TokenLearner compresses to 8, and only then does a relatively small decoder-only transformer see anything. Of its 35M parameters the transformer is only a fraction; almost all of the visual understanding happens inside the CNN. BC-Z and most late-fusion multi-task policies look similar: each modality runs its own heavy encoder, produces one embedding, and the embeddings are concatenated or multiplied at the end.
+
+**Octo's approach.** Images are cut straight into 16×16 patches and embedded by a very shallow conv stack, then dropped into the sequence as tokens. Language is encoded with T5-base; the goal image is also patched into tokens. Then everything runs through the *same* transformer — early fusion from the very first layer, with language and pixels interacting in the attention of **every** layer instead of being processed separately and merged at the end.
+
+**Why choose this.**
+
+- *Scalability.* The transformer is the architecture with the cleanest known scaling behavior. Going from Octo-Small (27M) to Octo-Base (93M) is basically just changing the transformer's width and depth; the tokenizer doesn't move. If the compute lived in the CNN, scaling up would mean swapping the backbone and redoing the whole pretraining.
+- *It pairs with design point 1.* The meaning of a lightweight tokenizer is that when you add a wrist camera or a force sensor, you only write a new small tokenizer that produces a new token group, and the pretrained transformer weights can be used untouched. Conversely, if the knowledge lives in a heavy encoder trained for one particular combination of inputs, adding a sensor means changing the encoder's structure, and the fusion topology is hard-wired — transfer becomes painful. The paper's headline claim, that a generalist policy can be fine-tuned to new observation and action spaces, is largely bought by this design.
+- *Representational power.* FiLM is essentially a channel-wise affine modulation of CNN feature maps, so language controls vision at a very coarse granularity. Full attention lets an instruction like "put the red cup in the drawer" selectively attend to specific patches.
+
+**The cost.** You give up the CNN's inductive biases — locality and translation equivariance — so the model is data-hungry. The precondition for Octo doing this at all is the 800k OXE trajectories. In the small-data regime a heavy ResNet encoder is often still the more stable choice; this is the same story as the ViT-versus-CNN debate in the ImageNet era. And with more tokens, the cost of attention goes up too.
+
+#### Design point 3: align the gripper dimension
+
+**The problem.** Open X-Embodiment is stitched together from 20-odd labs, and each lab defined its own action space. The arm's 6 degrees of freedom are manageable (almost everyone uses a delta end-effector pose, with per-dataset normalization on top), but **the 7th dimension, the gripper, is a mess**. Four conventions account for most of the divergence:
+
+1. **Absolute, 1 = open** — the label says directly whether the gripper should be open or closed now.
+2. **Absolute, 0 = open** — same semantics, values completely inverted.
+3. **Relative delta, +1 = opening / −1 = closing** — completely different semantics: the value is a *change*, not a *state*. It is 0 most of the time and only non-zero at the instant of a transition.
+4. **Continuous with ramps** (Bridge) — intermediate values exist; opening and closing are continuous ramps rather than step functions.
+
+**Why unification is non-negotiable.** This is not a "the format looks untidy" problem — it is that **the training signals cancel each other out**. For the very same "holding an object" frame, if dataset A labels it 0 and dataset B labels it 1, the model's optimal solution is to output 0.5, which is wrong on *every* embodiment. That is a direct label conflict, and adding a dataset ID doesn't get around it (Octo doesn't want a dataset ID anyway, because it would destroy zero-shot transfer to a new robot).
+
+The relative convention is worse still, because even the **semantic axis** differs: absolute is a state, relative is a derivative, and their zeros mean completely different things — absolute 0 is "closed," relative 0 is "keep doing what you're doing." A numeric rescale can't save this; you have to integrate the deltas over time to recover the state.
+
+**Octo's fix.** Map everything onto one convention, **absolute, +1 = open / 0 = closed**:
+
+- inverted datasets are simply flipped;
+- relative datasets are accumulated along time to reconstruct a binary open/closed state;
+- Bridge's continuous values are binarized with a threshold.
+
+> **My take:** this is the least glamorous but most critical part of cross-embodiment learning. The paper's contribution is written up as architecture, but whether things actually work depends heavily on how cleanly this kind of action-space alignment is done. Note the contrast with the arm's 6 dimensions: Octo normalizes those with per-dataset statistics and never really unifies them into one physical coordinate frame. The gripper has to be treated specially precisely because its semantics are discrete — statistical normalization does nothing for it.
+
+### Adapting to New Observation and Action Spaces
+
+This brings us to the next problem: **how do you adapt a pretrained generalist to a new observation or action space?** Concretely: a new robot; new sensing modalities such as force-torque sensing; a different number of cameras; or switching from Cartesian control to joint control.
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/Screenshot_2026-09-14_at_2.22.27_PM.png"
+  alt="Octo fine-tuning: a new observation adds a token group, a new action space adds a new readout and action head, the transformer is kept"
+  width={640}
+  height={383}
+/>
+
+Paper: [Octo: An Open-Source Generalist Robot Policy](https://arxiv.org/abs/2405.12213)
+
+The slide shows the payoff of design points 1 and 2. Pretraining (top) uses task tokens, observation tokens and readouts. At fine-tuning time (bottom), a **new observation** just becomes a new token group produced by a new lightweight tokenizer, and a **new action space** becomes a new readout token with a **new action head**. The Octo Transformer in the middle keeps its pretrained weights. The representation is *adaptable* by construction rather than by luck.
+
+## Cross-Embodiment Learning: One Policy for Many Robots
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/Screenshot_2026-07-14_at_1.17.04_PM.png"
+  alt="How generalist is a single-arm policy? Can we learn from more embodiments and transfer across them?"
+  width={600}
+  height={295}
+/>
+
+Octo is a generalist across tasks and labs, but it is still a single-arm manipulation policy. The natural follow-up: how "generalist" is that, really? Can we learn from *more* embodiments — quadrupeds, navigation robots, quadcopters — and transfer knowledge across them?
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/Screenshot_2026-07-14_at_1.18.36_PM.png"
+  alt="One policy for manipulation, navigation, locomotion and aviation: 900k trajectories into a Cross-Embodied Transformer"
+  width={640}
+  height={292}
+/>
+
+CrossFormer is the answer from the same group. It trains one policy on 900k trajectories spanning navigation, locomotion, single-arm manipulation and bimanual manipulation. The observation spaces are flexible, the action spaces range from 2 dimensions all the way up to 1,400 (long action chunks for bimanual arms), and the control frequencies span 5 Hz to 50 Hz.
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/Screenshot_2026-07-14_at_1.19.35_PM.png"
+  alt="CrossFormer model: per-modality tokenizers, a shared Cross-Embodied Transformer, and embodiment-specific action heads"
+  width={640}
+  height={343}
+/>
+
+Paper: [Scaling Cross-Embodied Learning: One Policy for Manipulation, Navigation, Locomotion and Aviation](https://arxiv.org/abs/2408.11812) (Doshi, Walke, Mees, Dasari, Levine, CoRL 2024)
+
+Three design goals drive the model:
+
+- **No action space alignment required** — the painful gripper-style unification from Octo is avoided entirely.
+- **Consume data from *any* robot embodiment.**
+- **Maximize parameter sharing across embodiments.**
+
+The way to get all three is **embodiment-specific heads**. Each observation type — workspace image, navigation image, wrist image, quadruped proprioception, bimanual proprioception — has its own tokenizer (a ResNet with FiLM conditioning on the language instruction). All tokens flow into one shared Cross-Embodied Transformer. Readout tokens are then routed to separate action heads: a quadruped head, a single-arm head, a navigation head, a bimanual head. Everything before the heads is shared; only the last layer knows which robot it is.
+
+### Two Ways to Emit Actions for Many Embodiments
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/c3cc0021-d646-4225-846c-d71854faabf7.png"
+  alt="CrossFormer-style separate heads versus π0-style single action expert with a padded action space"
+  width={640}
+  height={306}
+/>
+
+Paper: [CrossFormer](https://arxiv.org/abs/2408.11812) · [π0: A Vision-Language-Action Flow Model for General Robot Control](https://arxiv.org/abs/2410.24164)
+
+The lecture contrasts two ways of turning a shared backbone into actions for different robots. (I've pulled this slide forward from the "tips" part of the lecture, since it completes the cross-embodiment story.)
+
+- **CrossFormer-style:** a shared transformer backbone followed by **separate heads** — single-arm, bimanual, quadruped, drone — each emitting its native action dimensionality. No interference between embodiments in the output layer, but no parameter sharing there either, and someone has to choose the head.
+- **π0-style:** a shared backbone followed by a **single action expert** with a **padded action space**. Every embodiment's action vector is padded to the largest dimension; a single-arm policy fills the first few slots, a bimanual policy fills more, and the unused dimensions are ignored. Maximal sharing and one output path, at the cost of the model having to work out for itself which robot it is driving.
+
+### How does the policy know which embodiment it's controlling at test time?
+
+- **CrossFormer:** it is **hard-coded by the user** — you pick the head that matches your robot.
+- **π0:** it is **inferred from the observation** — the camera images and the proprioceptive state are enough to tell which robot is in front of it, and the action expert fills in the corresponding dimensions.
+
+## Does Multitask Pre-Training Actually Help Post-Training?
+
+Everything above rests on an assumption: that pretraining a generalist on lots of tasks makes it better and cheaper to adapt to *your* task afterwards. The Large Behavior Model (LBM) study from Toyota Research Institute is the most careful test of that assumption to date.
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/Screenshot_2026-09-14_at_2.42.52_PM.png"
+  alt="Does multitask pre-training help post-training? Diffusion transformer policy, 1,700 h of data, blind A/B tests, 1,800 real and 47,000 sim rollouts"
+  width={640}
+  height={331}
+/>
+
+Paper: [A Careful Examination of Large Behavior Models for Multitask Dexterous Manipulation](https://arxiv.org/abs/2507.05331) (Toyota Research Institute, 2025)
+
+The setup: a diffusion transformer policy pretrained on roughly 1,700 hours of data, evaluated with **blind A/B testing** against from-scratch single-task baselines, over roughly 1,800 real-world and 47,000 simulated rollouts across 29 tasks. The conclusions:
+
+The good news:
+
+- Pretraining helps, and the improvement is **statistically significant**.
+- Post-training is **3–5× more data-efficient** with a pretrained model.
+
+The caveats:
+
+- The benefit is **largest when post-training data is scarce** — with plenty of task data, the gap shrinks.
+- **Absolute success-rate gains are modest.**
+- **Data normalization often dominated** architectural or algorithmic changes.
+
+> **My take:** the rigor here is the point. Most robot papers report a handful of trials per task, so a "pretraining helps" claim is often within noise. Blind A/B tests with thousands of rollouts are what it takes to say it with a straight face — and the answer is a qualified yes rather than a triumphant one. The last warning also rhymes with the gripper section above: how you normalize the data can matter more than the model.
+
+## From VLMs to VLAs: Do Internet-Scale Priors Transfer to Control?
+
+Everything so far trains on robot data **from scratch**. The next question is whether we can skip that: do internet-scale priors like vision-language models (VLMs) transfer to control?
+
+In plain language: a VLM has "read ten thousand books" (text) and "traveled ten thousand miles" (images and video) on the web, but it has never had a body. If we bolt it onto a robot arm, can the common sense and visual understanding it already has let it learn to control the arm from only a *small* amount of physical data?
+
+The precedent is **LLaVA**, which showed how to make a language model see: prepend image tokens to the text sequence, and let the LLM process everything in a single unified self-attention pass. From the LLM's point of view, the image is just another token sequence it can attend to. The question the lecture asks is: can we treat **robot actions** the same way?
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/Screenshot_2026-07-14_at_1.24.39_PM.png"
+  alt="Turning a pretrained VLM into a VLA: same vision encoder, same tokenizer, same weights fine-tuned; language tokens become action tokens"
+  width={600}
+  height={345}
+/>
+
+Paper: [Visual Instruction Tuning (LLaVA)](https://arxiv.org/abs/2304.08485) · [RT-2: Vision-Language-Action Models Transfer Web Knowledge to Robotic Control](https://arxiv.org/abs/2307.15818) · [OpenVLA: An Open-Source Vision-Language-Action Model](https://arxiv.org/abs/2406.09246)
+
+The slide shows the recipe that RT-2 and OpenVLA use to turn a VLM into a **vision-language-action model (VLA)**:
+
+- **Left, the pretrained VLM.** Images go through a vision encoder (ViT / CLIP), text through a subword tokenizer, and an autoregressive LLM transformer produces language tokens from a vocabulary of roughly 32k IDs. Output: a natural-language answer.
+- **Right, fine-tuned into a VLA.** The image is now the robot camera, the text is the task command, the vision encoder and vocabulary are unchanged, and the *same weights* are fine-tuned on robot data. The only real change is the output: each action dimension is discretized into 256 bins, and those bins are mapped onto **256 reused vocabulary IDs** (OpenVLA overwrites the least-used tokens in the Llama vocabulary). A prediction like `1 128 91 241 5 101 127` is de-tokenized back into $[\Delta x, \Delta y, \Delta z, \Delta\theta, \text{grip}]$.
+
+Nothing about the transformer knows it is now driving a robot. That is exactly the point — the pretrained knowledge is preserved because the model is still doing what it was trained to do: predict the next token.
+
+## Tips & Tricks for Training VLAs
+
+The second half of the lecture is practical: what actually goes wrong when you train these things at scale, and what people do about it.
+
+### How do I know my VLA training has converged?
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/Screenshot_2026-07-14_at_1.26.29_PM.png"
+  alt="Action token accuracy approaching a 95% target, and L1 / L2 action error curves"
+  width={640}
+  height={293}
+/>
+
+The training loss alone is not very informative, so people track three curves:
+
+- **Action token accuracy** — for autoregressive VLAs, train until this approaches **95%**. It is computed under teacher forcing and answers "did we pick the *exact* action bin?"
+- **L1 action error** and **L2 action error** — after de-tokenization, how far are the predicted *continuous* actions from the ground-truth actions? Token accuracy alone can't distinguish a near-miss (the neighboring bin) from a wild miss; these two can.
+
+### Batching heterogeneous datasets
+
+The datasets in OXE have different observation spaces — most obviously, a different number of cameras. Dataset A might have one third-person camera; dataset B one third-person plus two wrist cameras. How do you put both in the same batch?
+
+**Method 1: padding and masking.**
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/44e4ddf4-2d37-4125-be78-6cffcd9021f1.png"
+  alt="Padding and masking: dataset A samples get empty padding slots for the missing wrist cameras"
+  width={640}
+  height={296}
+/>
+
+Give every sample the same slots and fill the missing cameras with padding that is masked out of attention. It is the easiest thing to implement, but if half the datasets only have one camera, **half your batch is full of zeros** — wasted FLOPs.
+
+**Method 2: sequence packing.**
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/Screenshot_2026-07-14_at_1.28.56_PM.png"
+  alt="Sequence packing: concatenate variable-length samples into one sequence and record boundaries in cu_seqlens"
+  width={640}
+  height={311}
+/>
+
+Instead of padding, concatenate the variable-length samples back to back into one long sequence, and keep track of where each sample starts with the prefix sums of the sample lengths — `cu_seqlens = [0, 8, 16, 32, 48]` in the example, the same interface FlashAttention's variable-length kernels use. This **maximizes GPU throughput**, but it shifts the complexity into the attention layer: you need to **reset the positional encodings** and use **block-diagonal attention**.
+
+Attention needs care here:
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/Screenshot_2026-07-14_at_1.29.33_PM.png"
+  alt="Block-diagonal attention mask and per-sample positional encoding reset"
+  width={560}
+  height={375}
+/>
+
+1. **Attention must be block-diagonal.** Tokens in sample $i$ may only attend to other tokens in sample $i$. Without this mask, sample 1 would happily attend to sample 3's images.
+2. **Positional encodings reset at each boundary.** Token 0 of every sample gets position 0, not its absolute offset in the packed sequence. Otherwise sample 4 would see "position 24+" — a range the model never saw during pretraining, i.e. out-of-distribution input.
+
+### Dataloading
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/3fa63068-bdd6-4ede-800a-1eec2b29765c.png"
+  alt="Sequential shard reads with a shuffle buffer (Octo, OpenVLA) versus true random index-based reads"
+  width={640}
+  height={324}
+/>
+
+This slide is about the fact that **once the data scale goes up, dataloading itself becomes an engineering bottleneck in robot learning**, and about which side Octo and OpenVLA chose.
+
+**Two sampling strategies.**
+
+- **Left (what Octo uses):** data is stored on disk in shards (Octo uses RLDS / TFRecord, and so does OpenVLA), and it is read by **sequential streaming** — one shard from start to end. But sequentially read samples are highly correlated (consecutive frames come from the same trajectory and the same scene), and batching them directly would break training. So a **shuffle buffer** is attached behind the stream: an in-memory pool of capacity $N$, where new samples flow in and each batch element is drawn at random from the pool.
+- **Right:** flatten every transition into a flat index $[0 \ldots N]$, draw a random index each time, and seek to it on disk. This is the standard PyTorch `Dataset` + `RandomSampler` pattern.
+
+**Why the trade-off exists.**
+
+- *The I/O pattern decides everything.* Sequential reads saturate disk bandwidth, are prefetch-friendly, and work well when streaming from a cloud bucket (OXE is terabytes — it usually isn't sitting on a local SSD). Random seeks make no difference on a small dataset, but at terabyte scale on network storage, the latency of each seek will starve the GPU. That is the main reason Octo went left.
+- *The price is that randomness is only approximate.* The shuffle buffer is a sliding window: the pool only ever contains samples from around the current read position, so the samples inside one batch are correlated in where they sit in the dataset. If the buffer is too small, a batch ends up full of neighboring frames from the same trajectory, the gradient's variance is underestimated, and the effective batch size shrinks. That is what the red box on the slide — "too small → correlated batches" — means. The cost of a big buffer is RAM: Octo's buffer is genuinely large (tens to hundreds of GB of memory), which is why they recommend a high-RAM machine for pretraining.
+
+> **My take:** the last row of the table is the one I find most worth noticing. Octo consumes an **observation history** (window size greater than 1, i.e. several consecutive frames from the same trajectory). With sequential reads, the adjacent frames are already in hand, so building the window is free. Switch to flat-index random sampling and every sample costs an extra `window_size` seeks — the overhead multiplies. So the left-hand design and "the model consumes history" are a matched pair, not independent choices.
+
+One more note: the two sides are not black and white. A common mitigation in practice is to shuffle at the **shard level** as well — randomize the shard order each epoch and interleave reads from several shards at once — so that even with a limited buffer, the sources are already mixed. Octo's dataloader does exactly this interleaving, and on top of it mixes datasets with **sampling weights** at the dataset level (e.g. Bridge gets a high weight, small datasets get low ones). That mixture weight is actually one of the hyperparameters with a fairly large effect on results in the Octo paper.
+
+## The Current VLA Recipe: Knowledge Insulation
+
+The last modeling question: **how do you keep the action head from damaging the VLM's pretrained knowledge?** If continuous-action gradients flow straight into the backbone, the model tends to forget what it learned from the web — which was the whole reason for starting from a VLM.
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/Screenshot_2026-07-14_at_1.36.10_PM.png"
+  alt="Current VLA recipe: next-token prediction on FAST action tokens plus web data for the VLM backbone; a flow-matching action expert with stop gradient"
+  width={640}
+  height={323}
+/>
+
+Paper: [π0.5: A Vision-Language-Action Model with Open-World Generalization](https://arxiv.org/abs/2504.16054) (Physical Intelligence, 2025) · [Knowledge Insulating Vision-Language-Action Models: Train Fast, Run Fast, Generalize Better](https://arxiv.org/abs/2505.23705) (Driess et al., Physical Intelligence, 2025) · [FAST: Efficient Action Tokenization for Vision-Language-Action Models](https://arxiv.org/abs/2501.09747)
+
+The recipe has two halves:
+
+- **The backbone only ever does next-token prediction.** Actions are first discretized into tokens with **FAST** (apply a DCT to the action chunk to move it into the frequency domain, quantize, then compress with BPE), and then trained with cross-entropy exactly like language tokens. The backbone therefore stays in the same regime it was pretrained in — predicting discrete tokens, just with an action block added to the vocabulary. At the same time, **web data keeps being mixed in** ("Images (cameras + web)" on the slide) as co-training, which directly fights forgetting.
+- **The action expert uses flow matching, with a stop gradient.** It reads the backbone's representation and outputs continuous actions, but its gradients **do not flow back into the backbone** (the red stop-gradient bar on the slide). From the action expert's point of view the backbone is a frozen feature extractor; the representation is shaped entirely by the next-token-prediction path.
+
+### Why keep the action expert at all?
+
+If FAST tokens can already represent actions, why not just decode them autoregressively? Because **inference is too slow**. FAST generates one token at a time, and one action chunk can take dozens of decode steps — not viable for a 50 Hz control loop. Discretization also has quantization error, so the actions aren't smooth.
+
+So the design becomes deliberately asymmetric:
+
+- **At training time**, discrete tokens shape the representation (a clean signal that doesn't hurt the backbone).
+- **At inference time**, the action expert takes over: a few steps of flow integration spit out continuous actions (fast and smooth).
+
+## Evaluating Policies Is Expensive
+
+Back to the third ingredient. Real-robot evaluation is slow, expensive, and fragile — move a camera to a slightly different angle and you're already out of distribution. Two arguments for simulated evaluation:
+
+- **Sim evals democratize research** — you don't need the physical robot to compare policies.
+- **Sim evals are more reproducible** — the same scene, the same initial conditions, every time.
+
+The obvious worry is whether a simulated success rate has anything to do with the real one.
+
+<img
+  src="/images/robot-learning-generalist-robot-policies/Screenshot_2026-07-14_at_1.39.53_PM.png"
+  alt="SIMPLER success rate versus real success rate for RT-1, RT-1-X, RT-2-X and Octo — strongly correlated"
+  width={560}
+  height={336}
+/>
+
+Paper: [Evaluating Real-World Robot Manipulation Policies in Simulation (SIMPLER)](https://arxiv.org/abs/2405.05941) (Li, Hsu, Gu, Pertsch, Mees et al., CoRL 2024)
+
+SIMPLER answers that question empirically: across RT-1, RT-1-X, RT-2-X and Octo, simulated and real success rates are **highly correlated**, so SIMPLER is a reliable proxy for real-robot evaluation. What matters for getting there:
+
+1. **Accurate control dynamics** via **system identification (SysID)** — calibrate the simulated robot so it responds to actions the way the real one does.
+2. **Mitigating visual distribution shift** via **"visual matching"** — make the rendered scene look like the real camera feed, so the policy isn't evaluated on images it would never see.
+
+Newer work pushes evaluation further in several directions:
+
+- [**PolaRiS**](https://arxiv.org/abs/2512.16881) — scalable real-to-sim evaluation: short video scans of real scenes are turned into interactive simulation environments with neural reconstruction, with a sim co-training recipe to close the remaining gap.
+- [**RoboArena**](https://arxiv.org/abs/2506.18123) — the real-world counterpart: a distributed network of evaluators (seven institutions on the DROID platform) run double-blind pairwise comparisons of policies, and a ranking is aggregated from the preferences.
+- [**RoboLab**](https://arxiv.org/abs/2604.09860) — a high-fidelity simulation benchmark of 120 tasks organized by competency (visual, procedural, relational) and difficulty, built to expose generalization gaps that existing benchmarks miss.
+
+## Closing Thoughts
+
+Reading the lecture back, the through-line is that "generalist" is bought with engineering discipline at every stage, not with a single clever architecture:
+
+- **Data** — pool everything (OXE), then spend real effort making the action spaces mean the same thing (the gripper story).
+- **Model** — tokenize everything, keep the tokenizers light and the transformer heavy, and structure attention so new inputs and outputs can be bolted on (Octo, CrossFormer). When a VLM is the starting point, insulate it: next-token prediction on FAST tokens for the backbone, a stop-gradient flow-matching expert for fast continuous control (π0.5).
+- **Training** — pack sequences instead of padding, stream shards with a big shuffle buffer, and watch token accuracy and L1/L2 error rather than the loss.
+- **Evaluation** — the honest results (LBM) say pretraining helps but modestly, and the sim-eval results (SIMPLER, PolaRiS) say we can finally measure that cheaply enough to iterate.
