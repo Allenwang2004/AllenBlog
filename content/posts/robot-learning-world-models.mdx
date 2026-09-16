@@ -1,0 +1,377 @@
+---
+title: Robot Learning - World Models
+description: "Class notes from ETH Zürich's Robot Learning: From Fundamentals to Foundation Models — world models versus policies, pixel and latent action-conditioned world models from World Models to Dreamer V4, video tokenization, world action models such as DreamZero, and predicting in latent space with JEPA."
+descriptionEn: "Class notes from ETH Zürich's Robot Learning: From Fundamentals to Foundation Models — world models versus policies, pixel and latent action-conditioned world models from World Models to Dreamer V4, video tokenization, world action models such as DreamZero, and predicting in latent space with JEPA."
+slug: robot-learning-world-models-post
+date: 2026-09-17
+type: Post
+image: /images/robot_learning.png
+language: en
+---
+
+These are my notes from the *World Models* lecture of [**Robot Learning: From Fundamentals to Foundation Models**](https://video.ethz.ch/lectures/d-infk/2026/spring/263-5911-00L) (ETH Zürich, 263-5911-00L, Spring 2026, taught by Oier Mees). The previous lectures were about policies: models that look at the world and decide what to do. This one flips the question around and asks what we gain from a model that predicts *what happens next*. The answer takes a long road: from the original pixel-space visual foresight work, through the latent world models of the Dreamer line, to tokenizing internet video, to the world action models that are the newest way of building robot policies, and finally to the question of whether we need to predict pixels at all.
+
+The slides below are from the lecture. Wherever a slide is drawn from a paper, the paper is linked right under it.
+
+## World Models vs. Policies
+
+<img
+  src="/images/robot-learning-world-models/Screenshot_2026-09-16_at_12.47.42_AM.png"
+  alt="Left: a policy or VLA takes the state and a language goal and outputs the action to execute. Right: a world model takes the state and an action and outputs the next state."
+  width={640}
+  height={186}
+/>
+
+A **policy** (or a vision-language-action model, VLA) answers one question: *given the state $s_t$ and a goal $g$, what action should I take?* It is the distribution $\pi(a_t \mid s_t, g)$, and its output is a command to execute. A **world model** answers a different question: *given the state $s_t$ and an action $a_t$, what happens next?* It is the distribution $p(s_{t+1} \mid s_t, a_t)$, and its output is a prediction about the world.
+
+The reason to care about the second question is a weakness of the first. Policies and VLAs are built on top of vision-language models that were trained on static images and text, so they are **blind to physical causality and temporal dynamics**. They know what a cup is; they have never seen what happens when you push one. A policy maps observations to actions, but nothing in that mapping represents *why* an action leads to an outcome.
+
+Now suppose we could predict how different sequences of actions would affect the environment. Then we could try many candidate action sequences, see where each one leads, and **optimize for the best trajectory** instead of committing to whatever the policy emits first. That is the benefit of a world model: it turns acting into a search problem.
+
+### World models as data-driven simulators
+
+One way to think about a world model is as a **learned simulator**. A traditional simulator needs a hand-engineered physics engine: someone writes down rigid-body dynamics, contact models, friction coefficients, and so on, and the result is only as good as the engineering. A world model instead learns the dynamics from **real interaction data**. Whatever is hard to write down by hand (cloth, liquids, deformable objects, messy contact) is exactly what the data contains for free.
+
+### Definition
+
+The lecture's working definition: *given the current state, an action, and a memory of the past, what happens next?*
+
+$$
+p(s_{t+1} \mid s_t, a_t, h_t)
+$$
+
+where $h_t$ is a summary of the history. Two remarks on this definition that I found clarifying:
+
+- **Strictly speaking, video models are not world models.** A video generation model predicts $p(o_{t+1} \mid o_{\le t})$; it continues a clip, but it is not conditioned on an action. Without the $a_t$ in the conditioning, it cannot tell you what *your* choice does to the world.
+- What the action-conditioning buys you is **counterfactuals**: how would the environment change if I took a completely different action? A model that can answer this is a model you can plan with. A model that only continues the video you show it cannot.
+
+### Two ways to scale
+
+The lecture framed the current landscape as two ways of getting more capability:
+
+- **Scaling pretraining**: bigger models, more data.
+- **Scaling test-time compute**: spending more computation at inference time, reasoning before acting.
+
+The claim made in the lecture is that test-time reasoning is currently more effective than simply building a larger model. My reading of why this belongs in a world-model lecture: a world model is precisely the thing that lets a robot *spend* test-time compute productively. A policy without a world model has nothing to reason over; it can only run its forward pass once. With a world model it can roll out candidate futures and pick the best, which is what test-time compute means for a robot.
+
+### The All-or-Nothing Embodiment Hypothesis
+
+The lecture also stated a hypothesis about where the next breakthroughs will come from:
+
+> Robot learning capability breakthroughs will eventually only come from multi-embodiment models.
+
+The argument for it is two questions:
+
+1. Do you ever want to change your robot hardware, even just to tweak it?
+2. When you do change the hardware, do you want to throw away all your previous data?
+
+Everyone answers yes to the first and no to the second, and together those two answers imply the hypothesis: if data has to survive hardware changes, the model has to work across embodiments. I will come back to this, because world models turn out to be a natural fit for it. A model that predicts what happens *in the world* is much less tied to a particular body than a model that predicts which joints to move.
+
+## Pixel Action-Conditioned World Models
+
+The lecture uses the abbreviation **AC-WM** for an **action-conditioned world model**. The earliest ones worked directly in pixel space.
+
+<img
+  src="/images/robot-learning-world-models/Screenshot_2026-09-16_at_4.41.48_PM.png"
+  alt="Training: autonomous robot interaction produces a dataset of observation, action, next observation triples used to train a conv-LSTM pixel prediction model with an L2 loss and pixel warping. Test time: visual MPC samples N action sequences, rolls them out in the pixel model, scores them with a cost function, executes the best, and replans."
+  width={640}
+  height={192}
+/>
+
+Paper: [Visual Foresight: Model-Based Deep Reinforcement Learning for Vision-Based Robotic Control](https://arxiv.org/abs/1812.00568) (Ebert, Finn, Dasari, Xie, Lee, Levine, 2018)
+
+**Training.** A robot interacts with its environment autonomously (random pushing and poking, no human demonstrations), which produces a large dataset of triples $(o_t, a_t, o_{t+1})$. A convolutional LSTM is trained on it with an $\ell_2$ loss to predict the next frame. The key insight of this line of work is to **predict pixel motion, not pixel values**: the model outputs a flow field $\hat{F}_{t+1 \leftarrow t}$ and the predicted frame is the current frame warped by that flow,
+
+$$
+\hat{o}_{t+1} = \hat{F}_{t+1 \leftarrow t} \diamond o_t
+$$
+
+This matters because most of the next frame is just the current frame, slightly moved. Predicting "where does each pixel go" is a much easier problem than regenerating every pixel value from scratch, and it keeps object appearance intact.
+
+**Test time: visual MPC.** With the pixel model in hand, acting becomes model-predictive control in image space:
+
+1. Take the current observation $o_t$.
+2. Sample $N$ candidate action sequences $a_{t:t+H}$.
+3. Roll each one out through the pixel prediction model to get predicted frames $\hat{o}_{t:t+H}$.
+4. Score each rollout with a cost function. The slide lists three choices: **pixel distance** to a goal, a **goal image** compared through image registration, or a **few-shot success classifier**.
+5. Execute the best action $a^\ast$, observe the new frame, and replan.
+
+The optimizer is the **Cross-Entropy Method (CEM)**, which is gradient-free: sample sequences from a Gaussian, keep the top $k$, refit the Gaussian to them, and repeat. Planning happens every step.
+
+**The problems with pixel AC-WMs.** The lecture used this system to motivate everything that comes after, and the problems are visible in the diagram:
+
+- Predicting every pixel is expensive, and most pixels do not matter for the task. The model spends its capacity on the background and the texture of the table.
+- Pixel-space predictions get blurry over long horizons, and an $\ell_2$ loss actively rewards blur when the future is uncertain.
+- The cost function has to be defined in pixel space, which is why there are three different options on the slide and none of them is fully satisfying.
+- Sampling and scoring $N$ full video rollouts every control step is slow, which caps the horizon and the reaction speed.
+
+## Latent Action-Conditioned World Models
+
+So the natural next question was: **what if we compressed observations into a latent space and trained a policy entirely inside that learned world?**
+
+<img
+  src="/images/robot-learning-world-models/Screenshot_2026-09-16_at_4.44.54_PM.png"
+  alt="General structure of a latent AC-WM: environment observation goes through an encoder to a compact latent z_t, a dynamics model predicts the next latent and reward from z_t, h_t and a_t, and a policy acting on z_t and h_t is optimised on imagined rewards. Box: training the policy in imagination by fixing the encoder and dynamics, rolling out imagined latents, and optimising the policy on imagined rewards."
+  width={640}
+  height={242}
+/>
+
+The general structure of a **latent AC-WM** has three learned pieces:
+
+- An **encoder** $z_t = \mathrm{enc}_\phi(o_t)$ that compresses the observation into a compact latent code $z_t \in \mathbb{R}^d$.
+- A **dynamics model** that carries a recurrent memory $h_{t+1} = f(h_t, z_t, a_t)$ and predicts both the next latent $p(z_{t+1} \mid z_t, a_t, h_t)$ and the reward $p(\hat{r}_t \mid h_t, z_t)$.
+- A **policy** $a_t = \pi(z_t, h_t)$ that reads the latent state, not the pixels.
+
+The payoff is **training the policy in imagination**. Fix the encoder and the dynamics model, roll out a sequence of imagined latents $z_1, \dots, z_H$, let the policy act on them, and optimize the policy on the imagined rewards $\hat{r}_t$. The policy improves **without any real environment interaction**. The real environment is only touched to collect data for the world model; the expensive trial-and-error of reinforcement learning happens inside the model.
+
+### The original latent AC-WM: World Models
+
+<img
+  src="/images/robot-learning-world-models/Screenshot_2026-09-16_at_4.46.40_PM.png"
+  alt="The OG latent AC-WM, visual model: an encoder compresses an observed frame from a 3D game into a latent z, and a decoder reconstructs a blurry version of it."
+  width={520}
+  height={268}
+/>
+
+Paper: [World Models](https://arxiv.org/abs/1803.10122) (Ha, Schmidhuber, 2018)
+
+The original *World Models* paper split the agent into three parts, V, M, and C:
+
+- **V, the vision model**, is a variational autoencoder (VAE) that learns an abstract, compressed representation $z$ of each input frame. The slide shows an original frame and its reconstruction: it is blurry, and that is fine. The reconstruction does not need to be perfect; it only needs to keep what matters for the task.
+- **M, the memory model**, is an RNN (with a mixture-density output head, MDN-RNN) that predicts the next $z$ given the current $z$, the action, and its hidden state.
+- **C, the controller**, is a tiny linear policy trained with an evolutionary strategy (CMA-ES), entirely inside the dream produced by V and M.
+
+It was the first agent trained purely in imagination, and it solved car racing from pixels. It also has two structural problems, and the lecture spent real time on them because the fixes define the whole Dreamer line.
+
+### Why imagination without priors drifts
+
+**Problem 1: the RNN is trained on real $z_t$ from the VAE, never on its own predictions.**
+
+At training time, every frame of the game exists. The VAE compresses each frame into $z_t$, which you can think of as a summary of the picture ("the track bends left, the car is in the middle"). The RNN takes this *real* summary, plus its memory $h$ and the action $a$, and guesses what the next summary $z_{t+1}$ will be. In the next step it receives the real summary again, so a wrong guess costs nothing: it is immediately corrected.
+
+At imagination time, the controller is supposed to practice driving in the dream without running the game. There are no frames, so the VAE has nothing to encode. The only option is for the RNN to guess a $\tilde{z}_{t+1}$ (the tilde meaning "imagined, not real") and then **feed its own guess back in as the next input**. Concretely: at step 1 the truth is "the track bends slightly left" and the model guesses "bends left a bit more", a small error. At step 2 the model believes the slightly-too-left version is true and guesses further from it, so the error grows. By step 20 the imagined track can be a shape that does not exist in the game. **Sampling errors accumulate step by step, and the imagination drifts away from reality.**
+
+**Problem 2: there is no principled way to generate $z_t$ from $h_t$ alone, that is, no $p(z_t \mid h_t)$.**
+
+First, what a **prior** means here: *before* you see the frame, based on your memory of the past, what do you believe the current state is? People do this constantly. Walking through your own home with your eyes closed, you still know "the sofa is two steps ahead". That is the prior. Opening your eyes and seeing the sofa confirms it; that is the belief after combining the observation, the **posterior**. The important thing is that the eyes-closed guess and the eyes-open perception come from the *same* understanding of the house, so they agree with each other.
+
+In *World Models*, those two jobs are done by two modules that are **trained completely separately and never talk to each other**:
+
+- "Eyes open" is the VAE. It is trained first and alone, with one job: compress a single image to numbers and reconstruct the image. It knows nothing about time, nothing about actions, and nothing about the RNN that will later consume its output.
+- "Eyes closed" is the RNN with its MDN head. It is trained afterwards and can only passively imitate the numbers the VAE produces.
+
+An analogy: the VAE is a photographer who invented a private code for recording each photo, designed with exactly one goal, that the photo can be recovered from the code. The RNN is an apprentice who is later asked to guess the code of the *next* photo. But the photographer never considered whether the code would be *guessable*. The code might spend many digits on the texture of leaves at the roadside, which is impossible to predict and useless for driving, and the apprentice still has to guess them. Worse, nothing guarantees that the apprentice's guess is a *legal* code the photographer would ever have written. It may be a combination that decodes to a nonsensical picture, and when the RNN receives that strange input on the next step, it naturally handles it badly.
+
+This is what the slide means by "the VAE encodes the frame $o_t$, not the model's belief": $z$ is a compression of *this image*, not a representation of *the model's understanding of the world state*. When there is no image, the model has no self-consistent way to form a belief at all.
+
+### How Dreamer fixed it
+
+The core change in the Dreamer line is to put "eyes open" and "eyes closed" **inside the same model, train them together, and force them to agree**. The model learns two distributions at once:
+
+- The **prior** $p(z_t \mid h_t)$: guess the state from memory alone, eyes closed.
+- The **posterior** $q(z_t \mid h_t, o_t)$: infer the state from memory plus the current frame, eyes open.
+
+Training adds a penalty (a KL term) that requires the eyes-closed guess to stay close to the eyes-open inference. This has two effects. First, the $z$ sampled during imagination lives in the same region as the $z$ used during training, so the rollout does not wander into unfamiliar territory from step one. Second, and this is the subtle part, the *eyes-open* side is also pushed to represent the state in a form that is **easy to predict**. It stops wasting capacity on things like leaf texture that cannot be guessed, because every unpredictable detail it keeps costs it in the KL term.
+
+A piano analogy: a teacher who only ever tells you the correct next note produces a student who can follow but cannot play alone. A teacher who makes you *guess* the next note first, then shows you the answer and has you compare, produces a student whose internal expectation of the piece matches the real one. After enough of that, you can play with your eyes closed.
+
+This greatly reduces drift but does not eliminate it, so in practice the imagination horizon is still kept fairly short.
+
+<img
+  src="/images/robot-learning-world-models/Screenshot_2026-09-16_at_5.12.16_PM.png"
+  alt="Timeline of latent world models: World Models 2018 (V-M-C decomposition), PlaNet 2019 (RSSM), Dreamer V1 2020 (backprop through dynamics), Dreamer V2 2021 (categorical latents), Dreamer V3 2023 (symlog and fixed hyperparameters), Dreamer V4 2025 (flow matching, transformer, unlabeled video pretraining), each with its key innovation and headline result."
+  width={640}
+  height={214}
+/>
+
+Papers on this timeline:
+
+- [World Models](https://arxiv.org/abs/1803.10122) (Ha, Schmidhuber, 2018)
+- [PlaNet: Learning Latent Dynamics for Planning from Pixels](https://arxiv.org/abs/1811.04551) (Hafner et al., 2019)
+- [Dreamer V1: Dream to Control](https://arxiv.org/abs/1912.01603) (Hafner et al., 2020)
+- [Dreamer V2: Mastering Atari with Discrete World Models](https://arxiv.org/abs/2010.02193) (Hafner et al., 2021)
+- [Dreamer V3: Mastering Diverse Domains through World Models](https://arxiv.org/abs/2301.04104) (Hafner et al., 2023)
+- [Dreamer V4: Training Agents Inside of Scalable World Models](https://arxiv.org/abs/2509.24527) (Hafner, Yan, Lillicrap, 2025)
+
+Reading the timeline as a sequence of fixes:
+
+- **World Models (2018)** established the V-M-C decomposition (VAE + MDN-RNN + CMA-ES) and was the first agent trained purely in imagination.
+- **PlaNet (2019)** introduced the **RSSM** (recurrent state-space model), with a deterministic $h_t$ and a stochastic $z_t$, and the prior/posterior training described above. It planned with CEM in latent space and was about 200 times more sample-efficient than model-free methods.
+- **Dreamer V1 (2020)** replaced CEM and CMA-ES with an **actor-critic trained by backpropagating through the learned dynamics**, and outperformed model-free RL on DMControl with a policy learned entirely in imagination.
+- **Dreamer V2 (2021)** switched to **categorical latents** and KL balancing, and was the first world model to match DQN on Atari, reaching human level on 45 of 55 games.
+- **Dreamer V3 (2023)** added symlog transforms and value normalization so that **one set of hyperparameters works across all domains** (Atari, robotics, DMControl), and was the first to obtain diamonds in Minecraft from pixels, a task needing roughly 20,000 actions.
+- **Dreamer V4 (2025)** moved to flow matching and a transformer with KV caching, pretrains on **unlabeled video**, runs in real time on a single GPU, and obtains diamonds from offline data only, with no environment interaction at all.
+
+### Case study: DayDreamer
+
+Paper: [DayDreamer: World Models for Physical Robot Learning](https://arxiv.org/abs/2206.14176) (Wu, Escontrela, Hafner, Abbeel, Goldberg, 2022)
+
+DayDreamer is the answer to the obvious question: does any of this work outside of games? It applied the Dreamer method to four physical robots, learning online and directly in the real world with no simulator, and with the **same hyperparameters** across robots. The headline result is a quadruped that learns to roll off its back, stand up, and walk from scratch in about one hour of real-world time. The point for this lecture is not the specific robot but the fact that the imagination-training recipe transferred to hardware without per-robot tuning.
+
+## Scaling Up: Generative Video Models
+
+Dreamer's latents have one big limitation: they are **domain-specific**. The encoder is trained on the frames of one environment, and its $z$ means nothing outside that environment. What if we want a world model that has seen *all* of the video on the internet? That is the promise of generative video models as world models, and it immediately runs into a scaling problem.
+
+<img
+  src="/images/robot-learning-world-models/Screenshot_2026-09-16_at_5.17.16_PM.png"
+  alt="Context explosion: a 256 by 256 frame through a ViT encoder with 16 by 16 patches gives 256 tokens per frame; a 10-second clip at 20 FPS is 200 frames, so 51,200 tokens for one short clip, compared with GPT-4's 128K limit."
+  width={640}
+  height={133}
+/>
+
+A per-frame vision transformer produces far too many tokens. A $256 \times 256$ frame cut into $16 \times 16$ patches is $256$ tokens. A short 10-second clip at 20 FPS is 200 frames, so one clip is already **51,200 tokens**, and that is before any text or actions. For scale, GPT-4's entire context limit is 128K tokens. Before a video model can be a world model, this has to be solved.
+
+### Video tokenization and compression
+
+<img
+  src="/images/robot-learning-world-models/Screenshot_2026-09-16_at_5.18.23_PM.png"
+  alt="Three axes of video compression. Axis 1, spatial: a deeper VQ-VAE or VQGAN encoder reduces 256 tokens per frame to 4. Axis 2, temporal: tubelets (non-causal) or causal aggregation merge 8 frames into one time step. Axis 3, adaptive: ElasticTok allocates a variable token budget per frame by complexity. Combined in Cosmos: 512x compression, 51,200 tokens become 100 for a 10-second clip."
+  width={640}
+  height={337}
+/>
+
+The slide organizes the solutions along three independent axes:
+
+**Axis 1: spatial compression.** Use a deeper encoder so each frame produces fewer tokens. A VQ-VAE or VQGAN encoder with stride compresses $256 \times 256$ pixels down to a small grid of latent tokens; the slide's example goes from 256 tokens per frame to 4, a 64-fold reduction. Examples are VQGAN, the Stable Diffusion VAE, and the Cosmos CV8x8x8 tokenizer. This axis is causal for free, since it has no temporal dependency at all.
+
+**Axis 2: temporal compression.** Merge frames so there are fewer time steps. There are two mechanisms, and the difference between them matters:
+
+- **Tubelets**: a 3D patch over $(t, h, w)$ that encodes a whole tube of frames at once. This is **non-causal**, because encoding frame $t$ requires frames after $t$. Examples are TimeSformer, ViViT, and Cosmos when used for video analysis.
+- **Causal aggregation**: attend to the past only and decode frame by frame. This is **causal**. Examples are the Dreamer V4 tokenizer and the Cosmos world model.
+
+Either way, 200 time steps become 25, an 8-fold reduction.
+
+**Axis 3: adaptive compression.** Give each frame a variable token budget so complex frames get more tokens and simple ones get fewer. [ElasticTok](https://arxiv.org/abs/2410.08368) (Yan et al., ICLR 2025) does this with tail-drop masking during training, so tokens are ordered by information content and the tail can be dropped. It is causal, working per frame with context, and yields a 2 to 5 times reduction on average.
+
+**Combined**, as in [Cosmos](https://arxiv.org/abs/2501.03575) (NVIDIA, 2025): spatial 8x times temporal 8x gives **512x compression**, and the 51,200 tokens of a 10-second clip become about 100. The axes are independent and composable.
+
+The detail I want to underline is the causality requirement, because it is what makes a video tokenizer a *world model* tokenizer. A world model is used online: at time $t$ the robot only has frames up to $t$, so the tokenizer cannot peek at future frames. Tubelets are fine for analyzing a clip after the fact, but for a world model you need causal aggregation. That is why the two world-model examples on the slide (Dreamer V4 and the Cosmos world model) both sit in the causal column.
+
+## Video World Models: Where Do the Actions Live?
+
+Once the backbone is a video model, there is a design choice about where actions enter.
+
+<img
+  src="/images/robot-learning-world-models/Screenshot_2026-09-16_at_5.19.34_PM.png"
+  alt="Left: action-conditioned world models take observations plus future actions and output future states; examples Dreamer V1 to V4, DreamDojo, V-JEPA 2. Right: video-based action prediction models. WAM, world action model: a single joint model predicts video and actions, example DreamZero. VAM, video action model: a frozen video backbone pretrained on internet video feeds video features to an inverse dynamics model trained on robot data only, example mimic-video."
+  width={640}
+  height={267}
+/>
+
+**Action-conditioned world models (AC-WMs)**: actions in, future states out. Given the current observation and a planned sequence of actions, simulate what the world will look like. The action $a_t$ is an *input* that conditions the prediction. Everything so far has been in this family: Dreamer V1 to V4, [DreamDojo](https://arxiv.org/abs/2602.06949) (a generalist robot world model trained from large-scale human video, 2026), and [V-JEPA 2](https://arxiv.org/abs/2506.09985) (2025).
+
+**Video-based action prediction models**: pretrain on video, and predict actions *from* the generated frames. Here the action is an *output*. There are two sub-designs:
+
+- **WAM, world action model.** A single model that jointly predicts video and actions, $p(o_{t:t+H}, a_{t:t+H} \mid \text{text}, o_{0:t}, q_t)$, where $q_t$ is the robot's proprioceptive state. Example: [DreamZero](https://arxiv.org/abs/2602.15922) (Ye et al., 2026).
+- **VAM, video action model.** A **frozen** video backbone pretrained on internet video produces video features, and a lightweight inverse dynamics model (IDM) trained on robot data only maps those features to actions. Example: [mimic-video](https://arxiv.org/abs/2512.15692) (Pai, Achenbach, Montesinos, Forrai, Mees, Nava, 2025).
+
+The difference between WAM and VAM is where you draw the line between "understanding the world" and "controlling the robot". A VAM keeps them separate: the video model is never touched, and only the small IDM sees robot data. A WAM fuses them into one objective, at the cost of fine-tuning a very large model.
+
+### Why use a video backbone at all?
+
+Didn't we just say video is expensive? Why would you build a policy on a video backbone? The answer is the **sample efficiency problem of VLAs**.
+
+VLAs start from a vision-language model, and VLMs are trained on static images and text. They are blind to physical causality and temporal dynamics, because nothing in their pretraining data moves. To turn a VLM into a VLA you therefore need **large-scale teleoperation data**, since the robot data is the only place the model can learn dynamics from, and teleoperation is the most expensive data there is.
+
+A **video backbone** offloads the learning of dynamics to **scalable, action-free video data**. The internet has billions of videos of things moving, being pushed, falling, and deforming. The key idea is to use a generative video model as the backbone, so that all of that comes for free, and the robot data only has to teach the comparatively small remaining problem of control.
+
+## Case Study: DreamZero
+
+Paper: [World Action Models are Zero-shot Policies](https://arxiv.org/abs/2602.15922) (Ye et al., 2026)
+
+DreamZero is the newest paper the lecture covered and the clearest example of a WAM. Its backbone is [Wan2.1](https://arxiv.org/abs/2503.20314), a 14B image-to-video diffusion model, fine-tuned to jointly output future frames and action chunks; with system optimizations it runs closed-loop control at about 7 Hz.
+
+The question I had while reading it: isn't $p(a \mid s)$ enough? Why make the problem so much harder by modeling the joint distribution
+
+$$
+p(z, a \mid \text{memory}) = \underbrace{p(z \mid \text{memory})}_{\text{predict future frames}} \times \underbrace{p(a \mid \text{memory}, z)}_{\text{infer actions from frames}}
+$$
+
+where $z$ is the latent of the future frames? Working through the paper, there are four distinct benefits.
+
+### Benefit 1: orders of magnitude more supervision
+
+Take 1.6 seconds of training data (one action chunk, 48 steps at 30 Hz) and count how many "answers" each model gets to learn from.
+
+A VLA learns only $a$: 48 steps times a few dozen joint values, roughly one to two thousand numbers. And those numbers are sparse. They say "the wrist rotated this many degrees" and nothing about *why*.
+
+DreamZero learns $(z, a)$: the same actions, plus the reconstruction of several future frames, each of whose latents has tens of thousands of values. Those frames contain "how far the cup got pushed", "how the cloth deformed", "whether the hand actually touched the object". The paper's related-work section makes the same point: VLA generalization is limited by a fixed set of episode-level language tasks that cannot cover every possible physical interaction, whereas a video world model learns from *every pair of adjacent frames* in the data.
+
+Put differently: to a VLA, an episode of "fold the shirt" mainly teaches the actions of folding a shirt. To DreamZero, the same episode additionally teaches thousands of small physics lessons of the form "apply force like this, and the cloth moves like that".
+
+### Benefit 2: inheriting the physics knowledge of video models
+
+This is the most important one. Look at the factorization again.
+
+The **first term**, $p(z \mid \text{memory})$, is an extremely hard problem, but it is almost exactly the problem of *video generation*, and there are billions of videos on the internet to pretrain on. DreamZero's Wan2.1 backbone was trained this way and already knows how to do it.
+
+The **second term**, $p(a \mid \text{memory}, z)$, is **inverse dynamics**: "the frames go from the hand being here to the hand grasping the cup; how much do the joints have to rotate?" This is far easier than learning a policy from scratch, because the broad direction of the answer has already been decided by the frames.
+
+What about VLAs? They usually start from a VLM, which has seen a huge number of image-caption pairs. It knows what a cup and a coaster are. But it has **never learned how things move**. The paper says this directly: VLM priors encode *what to do* at a semantic level, but lack the spatial, geometric, and dynamical representations needed for *how actions should be executed*.
+
+So the choice to learn $p(z, a)$ is really a choice of **which pretrained model's knowledge to borrow**:
+
+|  | VLA | DreamZero |
+| --- | --- | --- |
+| Pretraining source | images + text | video |
+| Inherited knowledge | semantics: "this is a cup" | physics: "how things move" |
+| Who handles the hardest part | robot data, from scratch | the pretrained video model already can |
+
+If you only learn $p(a)$, the video model's knowledge is simply unusable: the training objective never asks the model to predict frames, so there is no channel through which physical common sense can flow into action prediction.
+
+### Benefit 3: video without action labels becomes training data
+
+Training $p(a \mid \text{memory})$ **requires action labels**, meaning robot joint values. Human videos have no joint values, so a VLA cannot use them directly.
+
+Because DreamZero's objective includes $z$, video-only data can still train the "predict frames" part. The paper's cross-embodiment experiment does exactly this: data from other robots or from humans is used only with the video prediction objective and no actions. With just **10 to 20 minutes** of such data, performance on unseen tasks improves by over **42% relative** (robot-to-robot transfer took task progress from 38.3% to 55.4%; human-to-robot from 38.3% to 54.3%).
+
+Robot action data is scarce and expensive; human video is effectively unlimited. This is the property that makes the approach scale, and it is also the concrete version of the embodiment hypothesis from the start of the lecture: data from a different body, or no robot body at all, is not thrown away.
+
+### Benefit 4: messy, diverse data becomes learnable
+
+A common failure of VLAs: for the same frame, the people who collected the data may have done many different things. The model can only look for regularities in the frame-to-action mapping, and the more diverse the data, the harder that gets.
+
+DreamZero has the intermediate future frames, so every action comes with an explanation of "what the world became after doing this". The causal relation between action and result is much clearer. The paper's hypothesis is that predicting only actions, without encoding knowledge of the future world state, makes it hard to exploit highly diverse, non-repetitive data, because the model has to implicitly infer dynamics from noisy state-action pairs.
+
+The experiments support this. On the same heterogeneous data, a VLA trained from scratch makes almost zero task progress across every category, while DreamZero reaches **62.2% average task progress**, more than twice the best pretrained VLA baseline at 27.4%. More convincingly, they scaled the VLA up to DreamZero's size, and the large VLA **still** failed to learn from the diverse data, often hovering near objects without making contact. The problem is not model size. **The objective $p(a)$ itself is insufficient.**
+
+## Do You Need to Predict Pixels at All?
+
+Every approach so far had a decoder somewhere: the pixel model, the VAE, Dreamer's reconstruction loss, the video diffusion backbone. At some point they all reconstruct or generate pixels. The last part of the lecture asks whether that is necessary.
+
+<img
+  src="/images/robot-learning-world-models/Screenshot_2026-09-16_at_5.32.10_PM.png"
+  alt="JEPA, joint-embedding predictive architecture: an encoder maps o_t to z_t, a predictor conditioned on a_t produces a predicted z_t+1, the same encoder maps o_t+1 to a target z_t+1, and the loss is the squared distance between them. No decoder. Collapse risk: the encoder could map all frames to the same vector so the loss is trivially zero. Three ways to prevent collapse: EMA target encoder (I-JEPA, V-JEPA 2), frozen pretrained encoder (DINO-WM), Gaussian regularisation (LeWorldModel)."
+  width={640}
+  height={342}
+/>
+
+Papers: [I-JEPA](https://arxiv.org/abs/2301.08243) (Assran et al., 2023), [V-JEPA 2](https://arxiv.org/abs/2506.09985) (2025), [DINO-WM](https://arxiv.org/abs/2411.04983) (Zhou et al., 2024), [LeWorldModel](https://arxiv.org/abs/2603.19312) (2026)
+
+The **Joint-Embedding Predictive Architecture (JEPA)** predicts in latent space and never leaves it:
+
+- An encoder maps the current frame to $z_t = \mathrm{enc}(o_t)$.
+- A predictor, conditioned on the action, produces $\hat{z}_{t+1} = \mathrm{pred}(z_t, a_t)$.
+- The *same* encoder maps the actual next frame to the target $z_{t+1} = \mathrm{enc}(o_{t+1})$.
+- The loss is simply $\lVert \hat{z}_{t+1} - z_{t+1} \rVert^2$.
+
+There is **no decoder** and no pixel reconstruction. The encoder is free to throw away everything that is unpredictable or irrelevant, which is exactly what we wanted from Dreamer's "predictable representation" but now without paying for a reconstruction term. This is the logical endpoint of the whole lecture: the pixel model predicted pixel values, visual foresight predicted pixel motion, Dreamer predicted latents but still reconstructed, and JEPA predicts latents and stops there.
+
+The price is **collapse**. If the encoder maps every frame to the same vector, the prediction error is zero and the objective is perfectly satisfied, with a representation that contains nothing. Without a decoder there is no force pulling information back into $z$. The slide lists three strategies to prevent it:
+
+- **EMA target encoder.** The target side uses a slow-moving copy of the encoder updated by momentum, which breaks the gradient symmetry between the two branches. Used by I-JEPA and V-JEPA 2. It works, but it is not fully end-to-end and needs tuning.
+- **Frozen pretrained encoder.** Fix the encoder to something pretrained such as DINO, so collapse is impossible because the encoder never changes. Used by DINO-WM. The cost is that there is no end-to-end learning at all; the representation is whatever DINO gives you.
+- **Gaussian regularization.** Force the distribution of latents to be Gaussian, which provably prevents collapse. Used by LeWorldModel, which is fully end-to-end with a single hyperparameter.
+
+## Closing Thoughts
+
+The lecture reads as one long argument about **what to spend your prediction budget on**:
+
+- A policy answers "what should I do"; a world model answers "what happens next". The second is worth having because it gives you counterfactuals, and counterfactuals are what make test-time search possible for a robot.
+- **Pixel AC-WMs** showed the idea works (predict pixel motion, plan with CEM) and also showed why pixels are the wrong currency: expensive, blurry, and hard to define a cost on.
+- **Latent AC-WMs** moved prediction into a compressed space and made training in imagination possible. The original *World Models* drifted because its encoder and its dynamics model never agreed on what $z$ meant; Dreamer fixed that by training the prior and the posterior together, and the Dreamer timeline is a sequence of refinements to that one idea.
+- **Video models** are the way to scale the same idea to internet data, but only after tokenization brings 51,200 tokens down to 100, and only with *causal* tokenizers, since a world model is used online.
+- **Where actions live** is the design decision of the moment. DreamZero's argument for jointly predicting $(z, a)$ is that it is the only way to let a video model's physics knowledge flow into control, and its results on action-free video and on diverse data are the strongest evidence I have seen for the all-or-nothing embodiment hypothesis.
+- **JEPA** asks the last question: if the point of the latent is to be predictable, why reconstruct pixels at all? The answer is that you do not have to, provided you deal with collapse.
+
+The thread I keep coming back to is that every step in this progression was a decision to predict *less*: fewer pixels, then no pixels, then only what is predictable. The models got more capable each time. For a field whose bottleneck is the cost of robot data, learning what *not* to predict seems to be the most important skill of all.
