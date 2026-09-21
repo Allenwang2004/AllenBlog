@@ -1,0 +1,227 @@
+---
+title: Reinforcement Learning(III)
+description: 從表格到函數近似，DQN、Policy gradient、REINFORCE 到 Actor-Critic
+descriptionEn: From tabular to function approximation, DQN, policy gradient, REINFORCE and actor-critic
+slug: reinforcement-learning(iii)-post
+date: 2026-09-21
+type: Post
+image: /images/RL.jpg
+language: zh-TW
+---
+
+## 前言
+
+這是強化學習系列的第三篇，也是最後一篇。[第一篇](/posts/reinforcement-learning(i)-post)建立了 Bellman equation 與 Bellman optimality equation 這兩個基礎工具，並在模型已知的情況下用 value iteration 與 policy iteration 求出最佳策略；[第二篇](/posts/reinforcement-learning(ii)-post)則用 Monte Carlo 與 TD learning 擺脫了模型，得到 Sarsa 與 Q-learning。
+
+但到目前為止，所有的方法都還是 tabular 的：把每個 $q(s, a)$ 存在一張表裡。這一篇要做兩件事：先從表格走到函數（function approximation），再從 value-based 走到 policy-based。
+
+<img
+  src="/images/reinforcement-learning(i)/overview.png"
+  alt="強化學習理論演進的 overview，本篇涵蓋 Chapter 8-10：value function methods（函數近似與 DQN）、policy gradient methods 與 actor-critic methods"
+  width={640}
+  height={469}
+/>
+
+對應到 overview 圖，這篇涵蓋的是 Chapter 8-10：
+
+- Value function approximation：把 Sarsa 與 Q-learning 從表格改寫成函數，並引入深度神經網路得到 DQN
+- Policy gradient：直接把 policy 參數化，用 gradient ascent 最佳化，得到 REINFORCE
+- Actor-Critic：把 policy gradient 跟 TD 的 value 估計結合起來
+
+## 從表格到函數：Value function approximation
+
+### 為什麼需要函數近似
+
+Tabular 的方法對 analyze 來說非常方便，但缺點是 difficult to handle large or continuous state or action spaces，不管從 storage 還是 generalization ability 來看都是：
+
+- **Storage**：表格的大小是 $|\mathcal{S}| \times |\mathcal{A}|$，state 一多就存不下；state 或 action 是連續的時候根本無法列舉
+- **Generalization**：表格裡每一格是獨立更新的，更新一個 $(s, a)$ 對其他格子完全沒有影響，所以沒拜訪過的 state 就沒有任何資訊
+
+所以我們要做的就是 from table to function：用一個帶參數 $w$ 的函數 $\hat{q}(s, a, w)$ 來近似 $q_\pi(s, a)$。最簡單的是線性函數 $\hat{q}(s, a, w) = \phi(s, a)^T w$，其中 $\phi(s, a)$ 是特徵向量；更一般的則是用神經網路。這樣一來只需要儲存 $w$，而且更新 $w$ 會同時改變所有 state 的值，沒看過的 state 也能靠相似的特徵得到合理的估計。
+
+### 怎麼學參數 $w$
+
+以估計 state value 為例，最自然的目標函數是估計值與真實值之間的均方誤差：
+
+$$
+J(w) = \mathbb{E}\Big[ \big( v_\pi(S) - \hat{v}(S, w) \big)^2 \Big]
+$$
+
+用上一篇的 SGD 來最小化它：
+
+$$
+w_{t+1} = w_t + \alpha_t \big( v_\pi(s_t) - \hat{v}(s_t, w_t) \big) \nabla_w \hat{v}(s_t, w_t)
+$$
+
+但 $v_\pi(s_t)$ 正是我們不知道的東西。解法跟上一篇一模一樣：用 MC 的 return $g_t$ 代替就是 MC with function approximation；用 TD target $r_{t+1} + \gamma \hat{v}(s_{t+1}, w_t)$ 代替就是 TD with function approximation。這就是 overview 圖上寫的「用函數近似 Bellman equation → J」：把解 Bellman equation 的問題改寫成最小化一個目標函數 $J(w)$。要注意 TD target 裡也含有 $w_t$，但更新時把它當成常數、不對它微分，所以嚴格說這不是真正的 gradient，而是 semi-gradient。
+
+把 state value 換成 action value，就得到 Sarsa 與 Q-learning 的函數近似版本。
+
+### Sarsa with function approximation
+
+<img
+  src="/images/reinforcement-learning(iii)/sarsa_function_approximation.png"
+  alt="Sarsa with function approximation 的 pseudocode：每一步收集 (r_t+1, s_t+1, a_t+1)，用 TD error 乘以 q hat 對 w 的梯度更新參數 w，再用 epsilon-greedy 更新 policy"
+  width={640}
+  height={333}
+/>
+
+更新的對象從表格裡的一格變成參數 $w$：
+
+$$
+w_{t+1} = w_t + \alpha_t \Big[ r_{t+1} + \gamma \hat{q}(s_{t+1}, a_{t+1}, w_t) - \hat{q}(s_t, a_t, w_t) \Big] \nabla_w \hat{q}(s_t, a_t, w_t)
+$$
+
+結構還是「TD error 乘以某個方向」，只是方向從單位向量變成 $\nabla_w \hat{q}$。事實上 tabular 的版本可以看成函數近似的特例：如果特徵向量 $\phi(s, a)$ 是 one-hot 的，那 $\nabla_w \hat{q}$ 就只有 $(s_t, a_t)$ 那一個分量是 $1$，更新式就退化回上一篇的 Sarsa。
+
+### Q-learning with function approximation
+
+<img
+  src="/images/reinforcement-learning(iii)/q_learning_function_approximation.png"
+  alt="Q-learning with function approximation（on-policy 版本）的 pseudocode：TD target 改用 max over a 的 q hat(s_t+1, a, w_t)，其餘與 Sarsa 相同"
+  width={640}
+  height={347}
+/>
+
+同樣地，Q-learning 只是把 TD target 換成 $\max$：
+
+$$
+w_{t+1} = w_t + \alpha_t \Big[ r_{t+1} + \gamma \max_{a \in \mathcal{A}(s_{t+1})} \hat{q}(s_{t+1}, a, w_t) - \hat{q}(s_t, a_t, w_t) \Big] \nabla_w \hat{q}(s_t, a_t, w_t)
+$$
+
+## Deep Q-learning（DQN）
+
+再來就是引入 deep neural network 的時期了。The earliest and most successful algorithm that introduced deep neural networks into RL 就是 DQN：直接用一個深度神經網路當作 $\hat{q}(s, a, w)$，並且最小化底下這個目標函數：
+
+$$
+J(w) = \mathbb{E}\Big[ \big( R + \gamma \max_{a \in \mathcal{A}(S')} \hat{q}(S', a, w) - \hat{q}(S, A, w) \big)^2 \Big]
+$$
+
+也就是 Bellman optimality error 的平方期望值。不過直接用 SGD 去最小化它會遇到問題：目標值 $R + \gamma \max_a \hat{q}(S', a, w)$ 裡也含有 $w$，每更新一次 $w$，目標值就跟著變，訓練會非常不穩定。DQN 用了兩個技巧來解決：
+
+<img
+  src="/images/reinforcement-learning(iii)/dqn.png"
+  alt="Deep Q-learning（off-policy 版本）的 pseudocode：behavior policy 產生的樣本存進 replay buffer，每次均勻抽一個 mini-batch，用 target network 計算 y_T = r + gamma max q hat(s', a, w_T)，更新 main network 最小化 (y_T - q hat(s, a, w))^2，每 C 次迭代把 w_T 設為 w"
+  width={640}
+  height={306}
+/>
+
+**Target network**：維護兩個網路。Main network $w$ 每一步都更新；target network $w_T$ 則固定不動，只在每 $C$ 次迭代之後才把 $w$ 複製過去。計算目標值時用的是 target network：
+
+$$
+y_T = r + \gamma \max_{a \in \mathcal{A}(s')} \hat{q}(s', a, w_T)
+$$
+
+這樣一來目標值在一段時間內是固定的，最小化 $(y_T - \hat{q}(s, a, w))^2$ 就變成一個標準的 supervised regression 問題，只需要對 $w$ 微分。
+
+**Experience replay**：把 behavior policy 產生的樣本 $(s, a, r, s')$ 全部存進一個 replay buffer $\mathcal{B}$，訓練時從裡面均勻地抽 mini-batch，而不是按照樣本產生的順序來用。原因有兩個：
+
+1. 目標函數裡的期望值是對 $(S, A)$ 取的，數學上假設它們是均勻分佈；但沿著一條 trajectory 收集的樣本前後高度相關、分佈也不均勻。從 buffer 均勻抽樣可以打破相關性，讓資料更接近這個假設。
+2. 每個樣本可以被重複使用很多次，資料效率高得多。
+
+DQN 是 off-policy 的：資料由 behavior policy $\pi_b$ 產生並存進 buffer，學的是 optimal action value，這一點跟上一篇的 off-policy Q-learning 一樣，而 experience replay 之所以可行，也正是因為 Q-learning 本來就不在乎樣本是誰產生的。
+
+## 從 value-based 到 policy-based：Policy gradient
+
+### 直接參數化 policy
+
+回頭看前面到現在的所有方法，在 policy improvement 這一步都是用 $\arg\max_a q(s, a)$ 去做的：先估 value，再從 value 導出 policy，這叫 value-based。但其實我們是可以直接賦予 policy 參數的，寫成 $\pi(a \mid s, \theta)$。例如用一個神經網路，輸入 state、輸出每個 action 的機率（softmax），$\theta$ 就是網路的參數。這時候 policy 本身是一個機率分佈，改進 policy 就變成直接對 $\theta$ 做最佳化，這叫 policy-based。
+
+這樣做的好處是：可以自然地處理連續的 action space（輸出一個分佈的參數就好，不用對所有 action 取 max）、可以表示 stochastic policy，而且最佳化的對象直接就是我們真正關心的 policy。
+
+### Policy gradient theorem
+
+要最佳化就要先定義目標函數 $J(\theta)$，用來衡量一個 policy 有多好。常見的選擇有兩種：
+
+- Average state value：$\bar{v}_\pi = \sum_s d(s)\, v_\pi(s)$，也就是所有 state value 依照某個分佈 $d$ 的加權平均
+- Average reward：$\bar{r}_\pi$，也就是長期來看每一步平均能拿到的 reward
+
+不管用哪一個，都可以證明它們的梯度有同樣的形式，這就是 policy gradient theorem：
+
+$$
+\nabla_\theta J(\theta) = \mathbb{E}_{S \sim \eta,\, A \sim \pi} \Big[ \nabla_\theta \ln \pi(A \mid S, \theta)\, q_\pi(S, A) \Big]
+$$
+
+其中 $\eta$ 是 state 的分佈。這裡出現 $\ln$ 的原因是一個小技巧：$\nabla_\theta \pi = \pi \nabla_\theta \ln \pi$，把它代進去之後，原本對 action 的加總 $\sum_a \nabla_\theta \pi(a \mid s, \theta)\, q_\pi(s, a)$ 就能寫成對 $A \sim \pi$ 的期望值，而期望值就可以用採樣來估。這也要求 $\pi(a \mid s, \theta) > 0$ 對所有 action 都成立，所以 policy 一定是 stochastic 的，也就自帶了 exploration。
+
+有了梯度之後，就是我們現在常會看到的 policy gradient：用 gradient ascent 去最大化 $J(\theta)$，並且跟 SGD 一樣把期望值換成一個樣本：
+
+$$
+\theta_{t+1} = \theta_t + \alpha \nabla_\theta \ln \pi(a_t \mid s_t, \theta_t)\, q_t(s_t, a_t)
+$$
+
+這條式子有一個很直覺的解讀。因為 $\nabla_\theta \ln \pi = \nabla_\theta \pi / \pi$，所以它可以改寫成：
+
+$$
+\theta_{t+1} = \theta_t + \alpha \frac{q_t(s_t, a_t)}{\pi(a_t \mid s_t, \theta_t)} \nabla_\theta \pi(a_t \mid s_t, \theta_t)
+$$
+
+更新的方向是讓 $\pi(a_t \mid s_t)$ 變大的方向，而步伐的大小跟 $q_t(s_t, a_t)$ 成正比：好的 action 機率就往上調（exploitation），跟 $\pi(a_t \mid s_t)$ 成反比：目前很少被選到的 action 如果表現好，會被拉得更用力（exploration）。
+
+### REINFORCE
+
+上面的更新式裡還有一個 $q_t(s_t, a_t)$ 需要估計。最直接的做法是用 Monte Carlo：
+
+<img
+  src="/images/reinforcement-learning(iii)/reinforce.png"
+  alt="REINFORCE（policy gradient by Monte Carlo）的 pseudocode：依照 pi(theta) 產生一個 episode，對每個 t 用 discounted return 估計 q_t(s_t, a_t)，再用 theta 加上 alpha 乘以 grad ln pi 乘以 q_t 更新參數"
+  width={640}
+  height={264}
+/>
+
+REINFORCE 每一輪先依照目前的 $\pi(\theta)$ 跑完一整個 episode $\{s_0, a_0, r_1, \dots, s_{T-1}, a_{T-1}, r_T\}$，然後對每個時間點 $t$：
+
+1. **Value update**：用從 $t$ 往後的 discounted return 當作 $q_t(s_t, a_t)$ 的估計，$q_t(s_t, a_t) = \sum_{k=t+1}^{T} \gamma^{k-t-1} r_k$，這就是 MC
+2. **Policy update**：$\theta \leftarrow \theta + \alpha \nabla_\theta \ln \pi(a_t \mid s_t, \theta)\, q_t(s_t, a_t)$
+
+REINFORCE 是 on-policy 的，因為 policy gradient theorem 裡的期望值是對目前的 $\pi(\theta)$ 取的，所以樣本必須來自目前的 policy；同時它也是 offline 的，因為要等 episode 結束才能算 return。
+
+## Actor-Critic
+
+那因為上面的 policy gradient 是用 REINFORCE 的方式做的，它是基於 MC 來估 $q$ 的，就會有 MC 的所有問題：要等整個 episode 結束、變異數很大。而就如同上一篇，我們在 Sarsa 跟 Q-learning 已經找到了更好的做法，也就是用 TD 方法跟函數近似來估 value。所以把兩者結合起來，最終就會得到我們現在常見的 Actor-Critic 的設計了：
+
+- **Actor**：負責 policy update，也就是上面的 policy gradient
+- **Critic**：負責 value update，用 TD with function approximation 估計 $q(s, a, w)$，提供給 actor 使用
+
+最簡單的版本叫 QAC（Q actor-critic）：
+
+<img
+  src="/images/reinforcement-learning(iii)/actor_critic.png"
+  alt="最簡單的 actor-critic 演算法（QAC）的 pseudocode：每一步依照 pi(a|s_t, theta_t) 產生 a_t、觀察 r_t+1 與 s_t+1、再產生 a_t+1；critic 用 Sarsa with function approximation 更新 w，actor 用 policy gradient 乘以 q(s_t, a_t, w_t) 更新 theta"
+  width={640}
+  height={479}
+/>
+
+每一步先依照 $\pi(a \mid s_t, \theta_t)$ 產生 $a_t$，觀察 $r_{t+1}, s_{t+1}$，再依照同一個 policy 產生 $a_{t+1}$，得到一組 $(s_t, a_t, r_{t+1}, s_{t+1}, a_{t+1})$，然後：
+
+**Critic（value update）**：
+
+$$
+w_{t+1} = w_t + \alpha_w \Big[ r_{t+1} + \gamma q(s_{t+1}, a_{t+1}, w_t) - q(s_t, a_t, w_t) \Big] \nabla_w q(s_t, a_t, w_t)
+$$
+
+**Actor（policy update）**：
+
+$$
+\theta_{t+1} = \theta_t + \alpha_\theta \nabla_\theta \ln \pi(a_t \mid s_t, \theta_t)\, q(s_t, a_t, w_t)
+$$
+
+可以看到 critic 的更新式就是前面的 Sarsa with function approximation，actor 的更新式就是 policy gradient，只是 $q_t(s_t, a_t)$ 換成了 critic 的輸出 $q(s_t, a_t, w_t)$。有兩點值得注意：
+
+1. 這裡 critic 用的是 Sarsa 而不是 Q-learning，也就是 TD target 不用 $\max_a q(s_{t+1}, a)$。原因是 policy gradient theorem 裡需要的是「當前策略」的 value function $q_\pi$，而不是最佳策略的 $q^*$；用 $\max$ 估出來的會是後者，跟 policy gradient 的推導不符。
+2. 採樣跟更新都來自同一個 $\pi$，所以 QAC 是 on-policy 的。
+
+QAC 之後還有很多延伸。例如在 actor 的更新裡把 $q(s_t, a_t)$ 減去一個 baseline $v(s_t)$，變成 advantage $q(s_t, a_t) - v(s_t)$，可以在不改變期望值的情況下大幅降低變異數，這就是 A2C（advantage actor-critic）；如果想用其他 policy 產生的樣本來更新，可以透過 importance sampling 得到 off-policy 的 actor-critic，這也是 overview 圖上 Chapter 10 旁邊標的 on-policy 與 off-policy；針對連續的 action space 還有 deterministic policy gradient（DPG）。現在最常用的 PPO 等演算法，本質上也都是這個 actor-critic 框架的延伸。
+
+## 結語
+
+回頭看整個系列的 overview 圖，整條路徑其實是一連串「解決上一步的問題」的過程：
+
+1. 先用 Bellman equation 定義一個 policy 的價值，用 Bellman optimality equation 定義最佳策略，並在模型已知的情況下用 value iteration 與 policy iteration 求解
+2. 沒有模型，就用 Monte Carlo 拿樣本平均取代期望值
+3. MC 要等整個 episode 結束，就用 Robbins-Monro 與 SGD 的想法改成 incremental 的 TD learning，得到 Sarsa 與 Q-learning
+4. 表格存不下、也無法 generalize，就把表格換成函數，再換成深度神經網路，得到 DQN
+5. 用 $\arg\max$ 導出 policy 不適合連續動作，就直接參數化 policy，用 policy gradient 最佳化，得到 REINFORCE
+6. REINFORCE 用 MC 估 value 變異數太大，就把 TD 的 critic 加進來，得到 Actor-Critic
+
+當然相關的細節還有很多，只是在這裡想呈現的是我對於強化學習理論基礎的理解，那就先大概講到這。

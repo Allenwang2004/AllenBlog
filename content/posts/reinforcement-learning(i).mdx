@@ -1,0 +1,369 @@
+---
+title: Reinforcement Learning(I)
+description: 從基本名詞與 Bellman equation 出發，理解 Value iteration 與 Policy iteration 如何在已知模型下求出最佳策略
+descriptionEn: From basic concepts and the Bellman equation to value iteration and policy iteration under a known model
+slug: reinforcement-learning(i)-post
+date: 2026-09-21
+type: Post
+image: /images/RL.jpg
+language: zh-TW
+---
+
+## 前言
+
+這個系列主要是紀錄我個人研讀強化學習的一些心得。跟一般逐章介紹的方式不太一樣，我希望用一個「全域總整理」的角度，把整個強化學習的理論演進串起來：每一個階段是為了解決前一個階段的什麼問題而出現的，又是怎麼從前一個階段自然延伸出來的。
+
+內容主要整理自趙世鈺老師的《Mathematical Foundations of Reinforcement Learning》一書與對應的課程，文中的 pseudocode 也都取自該教材。
+
+<img
+  src="/images/reinforcement-learning(i)/overview.png"
+  alt="強化學習理論演進的 overview：Chapter 1-3 是基礎工具（基本概念、Bellman equation、Bellman optimality equation），Chapter 4 是 with model 的 value iteration 與 policy iteration，Chapter 5-7 從 with model 走到 model-free（Monte Carlo、stochastic approximation、temporal-difference），Chapter 8 從表格走到函數近似，Chapter 9-10 從 value-based 走到 policy-based（policy gradient、actor-critic）"
+  width={640}
+  height={469}
+/>
+
+上面這張圖是整個系列的地圖。可以看到從每個階段到下一個階段都有明確的定義：
+
+- Chapter 1-3 是基礎工具：基本概念、Bellman equation、Bellman optimality equation
+- Chapter 4 是在模型已知（with model）的情況下求最佳策略：Value iteration 與 Policy iteration
+- Chapter 5-7 是從 with model 走到 without model（model-free）：Monte Carlo、Stochastic approximation、Temporal-Difference
+- Chapter 8 是從表格表示走到函數表示（function approximation）
+- Chapter 9-10 是從 value-based 走到 policy-based：Policy gradient 與 Actor-Critic
+
+這個系列會拆成三篇，分別對應上面的三個區塊：
+
+1. 本篇：基本概念、Bellman equation、Bellman optimality equation、Value iteration 與 Policy iteration
+2. [Reinforcement Learning(II)](/posts/reinforcement-learning(ii)-post)：Monte Carlo、Robbins-Monro 與 SGD、TD learning、Sarsa 與 Q-learning
+3. [Reinforcement Learning(III)](/posts/reinforcement-learning(iii)-post)：函數近似、DQN、Policy gradient、REINFORCE 與 Actor-Critic
+
+底下就先從基礎工具開始，把這個轉變的過程說明得更順暢。
+
+## 基本名詞與符號
+
+首先，一定要先定義一些在強化學習領域會大量用到的名詞。這裡用書中的 grid world 當背景：agent 在一個格子世界裡移動，有些格子是禁區（forbidden），有一個格子是目標（target），agent 的任務是找到一條走到 target 的好路徑。
+
+**State（狀態）**：agent 相對於環境的狀態，記作 $s$。在 grid world 裡，state 就是 agent 所在的位置。
+
+**State space（狀態空間）**：所有 state 的集合，記作 $\mathcal{S} = \{s_1, s_2, \dots, s_n\}$。
+
+**Action（動作）**：在某個 state 下可以採取的動作，記作 $a$。在 grid world 裡有五個動作：上、右、下、左、原地不動，分別記作 $a_1, a_2, a_3, a_4, a_5$。
+
+**Action space of a state（某個狀態的動作空間）**：在 state $s$ 下所有可採取的動作的集合，記作 $\mathcal{A}(s)$。之所以要寫成 $s$ 的函數，是因為不同 state 可採取的動作可能不同。
+
+**State transition（狀態轉移）**：在 state $s$ 採取 action $a$ 後，agent 移動到 state $s'$ 的過程。它用條件機率來描述：
+
+$$
+p(s' \mid s, a)
+$$
+
+例如在 $s_1$ 往右走一定會到 $s_2$，就是 $p(s_2 \mid s_1, a_2) = 1$，其他 $s'$ 的機率都是 $0$。當然 state transition 也可以是隨機的，這個表示法都能涵蓋。
+
+**Policy（策略）**：告訴 agent 在每個 state 該採取什麼 action，同樣用條件機率描述：
+
+$$
+\pi(a \mid s), \qquad \sum_{a \in \mathcal{A}(s)} \pi(a \mid s) = 1
+$$
+
+如果 $\pi(a \mid s)$ 只在某一個 action 上是 $1$、其他都是 $0$，就叫 deterministic policy；否則就是 stochastic policy。
+
+**Reward（獎勵）**：採取一個 action 之後環境回饋的一個實數，記作 $r$。它同樣可以是隨機的，用 $p(r \mid s, a)$ 描述。Reward 可以想成是人跟 agent 溝通的方式：撞到邊界或進到 forbidden 給負的 reward，到達 target 給正的 reward，其他情況給 $0$。要注意 reward 取決於當下的 state 跟 action，而不是取決於下一個 state。
+
+**Trajectory 與 return**：trajectory 是一條 state-action-reward 的鏈：
+
+$$
+s_0 \xrightarrow{a_0} s_1, r_1 \xrightarrow{a_1} s_2, r_2 \xrightarrow{a_2} s_3, r_3 \cdots
+$$
+
+沿著這條 trajectory 收到的所有 reward 加總就叫 return，$G = r_1 + r_2 + r_3 + \cdots$。Return 可以用來評估一個 policy 的好壞：從同一個 state 出發，return 越大的 policy 越好。
+
+**Discounted return（折扣回報）**：當 trajectory 無限長時，return 可能會發散，所以引入一個 discount rate $\gamma \in (0, 1)$：
+
+$$
+G = r_1 + \gamma r_2 + \gamma^2 r_3 + \cdots = \sum_{t=0}^{\infty} \gamma^t r_{t+1}
+$$
+
+$\gamma$ 除了讓 return 收斂之外，也控制了 agent 的眼光：$\gamma$ 越接近 $0$，越看重近期的 reward（短視）；越接近 $1$，越看重長遠的 reward。
+
+**Episode**：agent 依照 policy 走到 terminal state 就停止的一段 trajectory。有終止狀態的任務叫 episodic task，沒有的則叫 continuing task。在數學上可以把 terminal state 視為一個 absorbing state（進去之後就不會再出來，之後的 reward 都是 $0$），這樣兩種任務就能用同一套框架處理。
+
+**Markov decision process（MDP）**：把上面所有東西整合起來的數學框架，它包含：
+
+- 集合：state space $\mathcal{S}$、action space $\mathcal{A}(s)$、reward set $\mathcal{R}(s, a)$
+- 模型：state transition probability $p(s' \mid s, a)$ 與 reward probability $p(r \mid s, a)$
+- Policy：$\pi(a \mid s)$
+- Markov property：下一個 state 與 reward 只跟現在的 state 與 action 有關，跟更早的歷史無關，也就是 $p(s_{t+1} \mid s_t, a_t, s_{t-1}, a_{t-1}, \dots) = p(s_{t+1} \mid s_t, a_t)$
+
+Markov property 是後面所有推導能夠成立的關鍵：正是因為未來只取決於現在，我們才能把一個 state 的價值寫成「當下的 reward 加上下一個 state 的價值」這樣的遞迴形式，也就是接下來的 Bellman equation。
+
+## State value 與 Bellman equation
+
+有了上面這些名詞之後，接著來看 Bellman equation 和 Bellman optimality equation。
+
+### State value
+
+首先要定義什麼叫 state value。從時間 $t$ 開始，記 state 為 $S_t$、採取的 action 為 $A_t$、收到的 reward 為 $R_{t+1}$，那 discounted return 就是一個隨機變數：
+
+$$
+G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots
+$$
+
+State value 就是在給定 policy $\pi$ 之下，從 state $s$ 出發所能得到的 return 的期望值：
+
+$$
+v_\pi(s) = \mathbb{E}[G_t \mid S_t = s]
+$$
+
+之所以要取期望值，是因為 policy、state transition、reward 都可能是隨機的，從同一個 state 出發可以走出很多條不同的 trajectory，每一條的 return 都不一樣。State value 越大，代表這個 policy 從這個 state 出發平均能拿到越多 reward，所以 state value 可以用來評估 policy 的好壞。
+
+### Bellman equation
+
+Bellman equation 描述的是不同 state 的 state value 之間的關係。它的公式是：
+
+<img
+  src="/images/reinforcement-learning(i)/bellman_equation.png"
+  alt="Bellman equation：v_pi(s) 等於 immediate reward 的期望值加上 gamma 乘以 future reward 的期望值，展開成對 action、reward、下一個 state 的加權和"
+  width={640}
+  height={193}
+/>
+
+推導的關鍵是把 return 拆成兩段，$G_t = R_{t+1} + \gamma G_{t+1}$，所以 state value 也就由 immediate reward 和 future reward 兩個期望值組成：
+
+- 第一項 $\sum_a \pi(a \mid s) \sum_r p(r \mid s, a)\, r$ 是 immediate reward 的期望值
+- 第二項 $\gamma \sum_a \pi(a \mid s) \sum_{s'} p(s' \mid s, a)\, v_\pi(s')$ 是 future reward 的期望值，也就是下一個 state 的 state value 打折之後再取平均
+
+這裡有幾點值得注意：
+
+1. Bellman equation 不是一條式子，而是對每個 $s \in \mathcal{S}$ 都有一條，所以它其實是一組聯立方程式。
+2. 式子裡的 $v_\pi(s)$ 與 $v_\pi(s')$ 都是未知數，要把整組一起解才能求出所有的 state value。
+3. 它依賴 policy $\pi$ 以及模型 $p(r \mid s, a)$、$p(s' \mid s, a)$。所以 Bellman equation 做的事是「給定一個 policy，求出它的 state value」，這個過程叫做 policy evaluation。
+
+把所有 state 的式子疊起來，Bellman equation 可以寫成矩陣形式：
+
+$$
+v_\pi = r_\pi + \gamma P_\pi v_\pi
+$$
+
+其中 $v_\pi$ 是所有 state value 排成的向量，$r_\pi$ 是每個 state 的 immediate reward 期望值排成的向量，$P_\pi$ 是在 policy $\pi$ 之下的 state transition matrix。要解它有兩種方式：
+
+- Closed-form solution：$v_\pi = (I - \gamma P_\pi)^{-1} r_\pi$，但矩陣求逆在 state 很多的時候計算量太大，實務上很少用
+- Iterative solution：$v_{k+1} = r_\pi + \gamma P_\pi v_k$，從任意的 $v_0$ 開始反覆代入，可以證明 $v_k \to v_\pi$
+
+後面 policy iteration 裡的 policy evaluation 用的就是第二種方式。
+
+### Action value
+
+除了 state value，還有一個很常用的 action value，定義成從 state $s$ 採取 action $a$ 之後所能得到的 return 期望值：
+
+$$
+q_\pi(s, a) = \mathbb{E}[G_t \mid S_t = s, A_t = a]
+$$
+
+兩者的關係是：
+
+$$
+v_\pi(s) = \sum_a \pi(a \mid s)\, q_\pi(s, a), \qquad q_\pi(s, a) = \sum_r p(r \mid s, a)\, r + \gamma \sum_{s'} p(s' \mid s, a)\, v_\pi(s')
+$$
+
+也就是說 state value 是 action value 依照 policy 取的加權平均；反過來，action value 就是 Bellman equation 方括號裡的那一項。Action value 之所以重要，是因為當我們想改進 policy 時，需要知道的正是「在這個 state 下哪個 action 比較好」，而這正是 action value 在比較的東西。
+
+## Bellman optimality equation
+
+另外一個叫做 Bellman optimality equation：
+
+<img
+  src="/images/reinforcement-learning(i)/bellman_optimality_equation.png"
+  alt="Bellman optimality equation：v(s) 等於對 policy 取 max 的加權 action value，也就是 max over pi of sum over a of pi(a|s) q(s,a)"
+  width={600}
+  height={123}
+/>
+
+這裡可以看到它加入了一個 $\max_\pi$，所以它得到的是 max value。
+
+### Optimal policy
+
+先定義什麼叫最佳策略。如果一個 policy $\pi^*$ 對所有的 state $s$ 都滿足 $v_{\pi^*}(s) \ge v_\pi(s)$，其中 $\pi$ 是任意其他的 policy，那 $\pi^*$ 就是 optimal policy，它的 state value 就叫 optimal state value。這個定義馬上帶出幾個問題：optimal policy 存在嗎？唯一嗎？長什麼樣子？要怎麼求？Bellman optimality equation 就是回答這些問題的工具。
+
+### 怎麼解 Bellman optimality equation
+
+跟 Bellman equation 比起來，這條式子多了一個 $\max_\pi$，看起來右邊同時有 $\pi$ 跟 $v$ 兩個未知數。解法是分成兩步：
+
+第一步，先固定 $v$，對右邊求 $\max_\pi$。因為 $\sum_a \pi(a \mid s)\, q(s, a)$ 是 $q(s, a)$ 的加權平均，而加權平均永遠不會超過最大值，所以最佳的做法就是把全部的權重放在 $q(s, a)$ 最大的那個 action 上：
+
+$$
+\pi(a \mid s) =
+\begin{cases}
+1 & a = a^*(s) = \arg\max_a q(s, a) \\
+0 & \text{otherwise}
+\end{cases}
+$$
+
+第二步，把 $\pi$ 消掉之後，式子就變成 $v(s) = \max_a q(s, a)$，也就是 $v = f(v)$ 的形式。可以證明 $f$ 是一個 contraction mapping，所以根據 contraction mapping theorem，這條式子有唯一解 $v^*$，而且用 $v_{k+1} = f(v_k)$ 反覆迭代就會收斂到 $v^*$。
+
+這個 $v^*$ 就是 optimal state value，對應的 greedy policy $\pi^*$ 就是 optimal policy。所以結論是：optimal policy 一定存在；optimal state value 唯一，但 optimal policy 不一定唯一（多個 action 的 action value 相同時可以任選）；而且 optimal policy 一定可以取成 deterministic 且 greedy 的形式，也就是在每個 state 選 action value 最大的那個 action。
+
+### 兩者的差異
+
+那上面兩個的差異，就是在 Bellman equation 其實需要先給定一個 policy，然後才會給你一個 value function；而 Bellman optimality equation 則是會求出 max value，並進而得到 policy。
+
+換句話說，前者是「評估」，後者是「求最佳」。這樣講可能有點抽象，可以從兩者所延伸出來的演算法來實際說明看看：
+
+- Bellman equation 所延伸出的演算法是 Policy iteration
+- Bellman optimality equation 所延伸出的演算法則是 Value iteration
+
+底下可以透過兩個例子清楚看出它們的差異。
+
+## Value iteration
+
+### 演算法
+
+Value iteration 其實就是上一節解 Bellman optimality equation 的迭代法 $v_{k+1} = f(v_k)$，只是把每一步拆開來看：
+
+<img
+  src="/images/reinforcement-learning(i)/value_iteration.png"
+  alt="Value iteration 的 pseudocode：模型已知，從初始猜測 v0 開始，每一輪對每個 state 與 action 計算 q_k(s,a)，policy update 取 argmax，value update 取 max"
+  width={640}
+  height={341}
+/>
+
+每一輪迭代分成兩步：
+
+1. **Policy update**：用目前的 $v_k$ 算出每個 state-action pair 的 $q_k(s, a)$，然後在每個 state 選出 $q_k$ 最大的 action 當作新的 policy $\pi_{k+1}$（greedy）
+2. **Value update**：$v_{k+1}(s) = \max_a q_k(s, a)$，也就是把 $q_k$ 的最大值當作新的 state value
+
+要注意的是，迭代過程中的 $v_k$ 並不是任何一個 policy 的 state value（它不滿足 Bellman equation），它只是一個中間值。要等到收斂之後，$v_k$ 才會等於 $v^*$。
+
+### 例子
+
+用一個 $2 \times 2$ 的 grid world 來實際跑一次：
+
+|  |  |
+|---|---|
+| $s_1$ | $s_2$（forbidden） |
+| $s_3$ | $s_4$（target） |
+
+五個 action 分別是 $a_1$ 上、$a_2$ 右、$a_3$ 下、$a_4$ 左、$a_5$ 原地不動。Reward 設定為進入 forbidden 或撞到邊界 $-1$、進入或停留在 target $+1$、其他 $0$，discount rate $\gamma = 0.9$。
+
+因為模型已知，可以先把每一格的 $q(s, a)$ 用 $v$ 的式子寫下來（q-table）：
+
+| $q(s, a)$ | $a_1$ | $a_2$ | $a_3$ | $a_4$ | $a_5$ |
+|---|---|---|---|---|---|
+| $s_1$ | $-1 + \gamma v(s_1)$ | $-1 + \gamma v(s_2)$ | $0 + \gamma v(s_3)$ | $-1 + \gamma v(s_1)$ | $0 + \gamma v(s_1)$ |
+| $s_2$ | $-1 + \gamma v(s_2)$ | $-1 + \gamma v(s_2)$ | $1 + \gamma v(s_4)$ | $0 + \gamma v(s_1)$ | $-1 + \gamma v(s_2)$ |
+| $s_3$ | $0 + \gamma v(s_1)$ | $1 + \gamma v(s_4)$ | $-1 + \gamma v(s_3)$ | $-1 + \gamma v(s_3)$ | $0 + \gamma v(s_3)$ |
+| $s_4$ | $-1 + \gamma v(s_2)$ | $-1 + \gamma v(s_4)$ | $-1 + \gamma v(s_4)$ | $0 + \gamma v(s_3)$ | $1 + \gamma v(s_4)$ |
+
+每一格的意思都是「immediate reward 加上 $\gamma$ 乘以下一個 state 的 value」。例如 $s_1$ 往上會撞到邊界、留在原地，所以是 $-1 + \gamma v(s_1)$；$s_2$ 往下會進到 target，所以是 $1 + \gamma v(s_4)$。
+
+**k = 0**：令 $v_0(s_1) = v_0(s_2) = v_0(s_3) = v_0(s_4) = 0$，代入 q-table：
+
+| $q_0(s, a)$ | $a_1$ | $a_2$ | $a_3$ | $a_4$ | $a_5$ |
+|---|---|---|---|---|---|
+| $s_1$ | $-1$ | $-1$ | $0$ | $-1$ | $0$ |
+| $s_2$ | $-1$ | $-1$ | $1$ | $0$ | $-1$ |
+| $s_3$ | $0$ | $1$ | $-1$ | $-1$ | $0$ |
+| $s_4$ | $-1$ | $-1$ | $-1$ | $0$ | $1$ |
+
+Policy update，每個 state 取最大值對應的 action：
+
+$$
+\pi_1(a_5 \mid s_1) = 1, \quad \pi_1(a_3 \mid s_2) = 1, \quad \pi_1(a_2 \mid s_3) = 1, \quad \pi_1(a_5 \mid s_4) = 1
+$$
+
+（$s_1$ 的 $a_3$ 與 $a_5$ 同為最大值 $0$，兩個都可以，這裡選 $a_5$。）
+
+Value update，每個 state 取最大的 q-value：
+
+$$
+v_1(s_1) = 0, \quad v_1(s_2) = 1, \quad v_1(s_3) = 1, \quad v_1(s_4) = 1
+$$
+
+**k = 1**：把 $v_1$ 代回 q-table（$\gamma = 0.9$）：
+
+| $q_1(s, a)$ | $a_1$ | $a_2$ | $a_3$ | $a_4$ | $a_5$ |
+|---|---|---|---|---|---|
+| $s_1$ | $-1$ | $-0.1$ | $0.9$ | $-1$ | $0$ |
+| $s_2$ | $-0.1$ | $-0.1$ | $1.9$ | $0$ | $-0.1$ |
+| $s_3$ | $0$ | $1.9$ | $-0.1$ | $-0.1$ | $0.9$ |
+| $s_4$ | $-0.1$ | $-0.1$ | $-0.1$ | $0.9$ | $1.9$ |
+
+Policy update：
+
+$$
+\pi_2(a_3 \mid s_1) = 1, \quad \pi_2(a_3 \mid s_2) = 1, \quad \pi_2(a_2 \mid s_3) = 1, \quad \pi_2(a_5 \mid s_4) = 1
+$$
+
+Value update：
+
+$$
+v_2(s_1) = 0.9, \quad v_2(s_2) = 1.9, \quad v_2(s_3) = 1.9, \quad v_2(s_4) = 1.9
+$$
+
+可以看到 $s_1$ 的策略從「原地不動」變成「往下走」。這時候的 policy 其實已經是最佳的了（$s_1$ 往下到 $s_3$、$s_3$ 往右到 $s_4$、$s_2$ 往下到 $s_4$、$s_4$ 停留），但 value 還沒收斂。接下來繼續迭代，policy 不會再變，只有 value 會持續往 $v^*$ 逼近，直到 $\|v_k - v_{k-1}\|$ 小於門檻為止。最後收斂到的 optimal state value 是 $v^*(s_1) = 9$、$v^*(s_2) = v^*(s_3) = v^*(s_4) = 10$（例如 $v^*(s_4) = 1 + 0.9 \, v^*(s_4)$ 解出 $10$）。
+
+## Policy iteration
+
+### 演算法
+
+<img
+  src="/images/reinforcement-learning(i)/policy_iteration.png"
+  alt="Policy iteration 的 pseudocode：模型已知，從初始 policy pi0 開始，每一輪先做 policy evaluation（迭代解 Bellman equation 求 v_pi_k），再做 policy improvement（計算 q_pi_k 並取 argmax 得到 pi_k+1）"
+  width={640}
+  height={399}
+/>
+
+Policy iteration 則是從一個初始的 policy $\pi_0$ 出發，每一輪做兩件事：
+
+1. **Policy evaluation**：解 Bellman equation $v_{\pi_k} = r_{\pi_k} + \gamma P_{\pi_k} v_{\pi_k}$ 求出目前 policy 的 state value。這本身就是一個迭代的過程（pseudocode 裡的內層 $j$ 迴圈），state 少的時候也可以直接用 closed-form 解。
+2. **Policy improvement**：用 $v_{\pi_k}$ 算出 $q_{\pi_k}(s, a)$，然後在每個 state 取 greedy action 得到 $\pi_{k+1}$。
+
+可以證明每一輪 improvement 之後 $v_{\pi_{k+1}} \ge v_{\pi_k}$，而且 $\pi_k$ 最終會收斂到 optimal policy。
+
+跟 value iteration 最大的差異在於：policy iteration 每一輪的 $v_{\pi_k}$ 是一個真正的 policy 的 state value（滿足 Bellman equation），所以它是「評估、改進、評估、改進」的循環；而 value iteration 的 $v_k$ 只是中間值，它等於是把 policy evaluation 只做一步就直接 improvement。這也正好對應到它們各自的根源：Bellman equation 與 Bellman optimality equation。介於兩者之間的做法（policy evaluation 只迭代固定的幾步就停）叫做 truncated policy iteration，實務上常用的其實是這種。
+
+### 例子
+
+用一個更簡單的例子：只有兩個 state，$s_2$ 是 target，action 有 $a_\ell$（左）、$a_0$（不動）、$a_r$（右）。Reward 設定同樣是撞到邊界 $-1$、進入或停留在 target $+1$、其他 $0$，$\gamma = 0.9$。
+
+|  |  |
+|---|---|
+| $s_1$ | $s_2$（target） |
+
+初始策略 $\pi_0$ 是兩個 state 都往左走：$\pi_0(a_\ell \mid s_1) = 1$、$\pi_0(a_\ell \mid s_2) = 1$。直覺上這是一個很差的策略。
+
+**k = 0，Policy evaluation**：依照 $\pi_0$ 寫出 Bellman equation：
+
+$$
+\begin{aligned}
+v_{\pi_0}(s_1) &= -1 + \gamma v_{\pi_0}(s_1) \\
+v_{\pi_0}(s_2) &= 0 + \gamma v_{\pi_0}(s_1)
+\end{aligned}
+$$
+
+（$s_1$ 往左撞牆留在原地拿 $-1$；$s_2$ 往左到 $s_1$ 拿 $0$。）這組方程式可以直接解，也可以用迭代解，結果是：
+
+$$
+v_{\pi_0}(s_1) = \frac{-1}{1 - 0.9} = -10, \qquad v_{\pi_0}(s_2) = 0.9 \times (-10) = -9
+$$
+
+**k = 0，Policy improvement**：用剛才的 state value 算出 action value：
+
+| $q_{\pi_0}(s, a)$ | $a_\ell$ | $a_0$ | $a_r$ |
+|---|---|---|---|
+| $s_1$ | $-1 + \gamma v_{\pi_0}(s_1) = -10$ | $0 + \gamma v_{\pi_0}(s_1) = -9$ | $1 + \gamma v_{\pi_0}(s_2) = -7.1$ |
+| $s_2$ | $0 + \gamma v_{\pi_0}(s_1) = -9$ | $1 + \gamma v_{\pi_0}(s_2) = -7.1$ | $-1 + \gamma v_{\pi_0}(s_2) = -9.1$ |
+
+每個 state 取最大值：
+
+$$
+\pi_1(a_r \mid s_1) = 1, \qquad \pi_1(a_0 \mid s_2) = 1
+$$
+
+也就是 $s_1$ 往右走到 target、$s_2$ 留在 target。這已經是 optimal policy 了，只用了一輪就從最差的策略跳到最好的策略。這裡值得注意的是，雖然 $v_{\pi_0}$ 全部都是負的（因為 $\pi_0$ 很差），但 policy improvement 比較的是同一個 state 之下不同 action 的相對大小，所以還是能正確選出好的 action。
+
+如果再跑一輪，policy evaluation 會得到 $v_{\pi_1}(s_1) = 1 + 0.9 \, v_{\pi_1}(s_2)$、$v_{\pi_1}(s_2) = 1 + 0.9 \, v_{\pi_1}(s_2)$，解出 $v_{\pi_1}(s_1) = v_{\pi_1}(s_2) = 10$；policy improvement 之後 policy 不再改變，演算法就收斂了。
+
+## 小結
+
+到這裡為止，我們還是在 with model 的範疇。所謂的 with model，就是需要知道 state transition probability $p(s' \mid s, a)$ 跟 reward probability $p(r \mid s, a)$，這類方法統稱為 dynamic programming。但在實際情況中，我們大多數時候不會知道這兩個東西，所以會需要 model-free 的方法。
+
+下一篇 [Reinforcement Learning(II)](/posts/reinforcement-learning(ii)-post) 就從 Monte Carlo 開始，看看怎麼在沒有模型的情況下用樣本取代期望值，再經過 Robbins-Monro 與 SGD，一路走到 TD learning、Sarsa 與 Q-learning。
