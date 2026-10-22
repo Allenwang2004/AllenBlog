@@ -1,0 +1,438 @@
+---
+title: Robot-control Practice
+description: "Hands-on robot control in MuJoCo: damped least-squares inverse kinematics, quintic trajectories with PID control, and a PPO policy for waypoint tracking."
+descriptionEn: "Hands-on robot control in MuJoCo: damped least-squares inverse kinematics, quintic trajectories with PID control, and a PPO policy for waypoint tracking."
+slug: robot-control-practice-post
+date: 2026-10-22
+type: Post
+image: /images/robot-control.png
+language: en
+---
+
+This post walks through three hands-on exercises on a simulated **SO-100** robot arm in MuJoCo. Each exercise adds one layer to the control stack: first pure geometry (inverse kinematics), then trajectories and feedback control (quintic splines and PID), and finally a learned controller (a PPO reinforcement learning policy). Along the way I add small **worked calculations** with real numbers, taken from the exercise code and the robot model, so that every formula is shown actually producing a value.
+
+The setup is the same throughout: a 6-joint arm (Rotation, Pitch, Elbow, Wrist Pitch, Wrist Roll, Jaw), simulated at 500 Hz (a physics timestep of $0.002$ s).
+
+## Exercise 1: Keypoints in the Workspace and Inverse Kinematics
+
+The goal is to design a set of keypoints along a **Lemniscate of Bernoulli** (an infinity sign) in the 3D workspace, and to implement **inverse kinematics (IK)** that finds the joint angles that put the end-effector on each keypoint.
+
+### Building the Keypoints
+
+The lemniscate lives in the $y$-$z$ plane:
+
+$$
+y(t) = \frac{a\cos t}{1 + \sin^2 t}, \qquad z(t) = \frac{a\cos t\,\sin t}{1 + \sin^2 t}, \qquad t \in [0, 2\pi)
+$$
+
+We sample `count = 16` evenly spaced values of $t$, fix $x$ at `x_offset = 0.3` m, and lift the curve by `z_offset = 0.25` m, so each keypoint is $(0.3,\ y,\ z + 0.25)$ with the default width $a = 0.25$.
+
+**Worked example.** For keypoint $k = 2$, $t = 2\pi \cdot 2/16 = \pi/4$. Then $\cos t = \sin t \approx 0.7071$ and $1 + \sin^2 t = 1.5$:
+
+$$
+y = \frac{0.25 \times 0.7071}{1.5} \approx 0.1179, \qquad z = \frac{0.25 \times 0.7071 \times 0.7071}{1.5} \approx 0.0833
+$$
+
+So the keypoint is $(0.3,\ 0.1179,\ 0.3333)$ m. For comparison, $k = 0$ ($t = 0$) gives $(0.3,\ 0.25,\ 0.25)$, the rightmost tip of the figure eight, and $k = 4$ ($t = \pi/2$) gives $(0.3,\ 0,\ 0.25)$, the crossing point in the middle.
+
+Here is the result:
+
+<video
+  src="/images/robot-control-practice/ik_lemniscate.mp4"
+  controls
+  muted
+  loop
+  playsInline
+  style={{ width: '100%', maxWidth: 560 }}
+/>
+
+Note that this is **not a physical motion**: the script directly teleports the joints to the IK solution of each keypoint, so there are no dynamics, no torques and no continuous trajectory between keypoints. Exercise 2 adds trajectory generation and control on top of this.
+
+### How the IK Solver Works (Damped Least Squares)
+
+1. Run forward kinematics and compute the position error $e = p_{target} - p_{ee}$; stop once $\|e\| < 10^{-3}$ (1 mm).
+2. Get the Jacobian $J$ ($6 \times n_v$) with `mj_jacSite`. It maps joint velocities to end-effector velocities: $\dot{x} = J\dot{q}$.
+3. Solve $(JJ^T + \lambda I)\,x = [k_p e,\ 0]$ with `np.linalg.solve` and set $\dot{q} = J^T x$. The orientation part of the error is set to zero because we only track position.
+4. Update $q \leftarrow q + \dot{q}\,dt$ and repeat (at most `max_iters` times).
+
+The solver's defaults are $\lambda = 10^{-3}$ (`damping`), $k_p = 2$ (`pos_gain`), $dt = 0.1$ and `max_iters = 2000`, and each $\dot{q}$ is clipped to $[-2, 2]$ rad/s before the update.
+
+The damping term $\lambda I$ keeps the matrix invertible near singular configurations (for example when the arm is fully stretched), where a plain pseudo-inverse would produce huge joint steps. The price is slightly slower convergence.
+
+### Worked Example: One DLS Step by Hand
+
+The real arm has a $6 \times 6$ Jacobian, which is too large to follow by hand, so take a planar two-link arm with link lengths $l_1 = l_2 = 0.1$ m and use the same $\lambda$, $k_p$ and $dt$ as the solver. Its forward kinematics and Jacobian are
+
+$$
+p = \begin{bmatrix} l_1 c_1 + l_2 c_{12} \\ l_1 s_1 + l_2 s_{12} \end{bmatrix}
+$$
+
+$$
+J = \begin{bmatrix} -l_1 s_1 - l_2 s_{12} & -l_2 s_{12} \\ l_1 c_1 + l_2 c_{12} & l_2 c_{12} \end{bmatrix}
+$$
+
+where $c_1 = \cos q_1$, $s_1 = \sin q_1$, $c_{12} = \cos(q_1 + q_2)$ and $s_{12} = \sin(q_1 + q_2)$.
+
+Start at $q = (0,\ \pi/2)$ (upper link along $x$, forearm pointing up) and aim for $p_{target} = (0.12,\ 0.08)$.
+
+**Step 1, error.** $p = (0.1,\ 0.1)$, so $e = (0.02,\ -0.02)$ and $\|e\| \approx 0.0283$ m (2.83 cm).
+
+**Step 2, Jacobian.**
+
+$$
+J = \begin{bmatrix} -0.1 & -0.1 \\ 0.1 & 0 \end{bmatrix}
+$$
+
+$$
+JJ^T + \lambda I = \begin{bmatrix} 0.021 & -0.010 \\ -0.010 & 0.011 \end{bmatrix}
+$$
+
+**Step 3, solve.** With $k_p e = (0.04,\ -0.04)$, solving the $2 \times 2$ system gives $x \approx (0.3053,\ -3.3588)$, and
+
+$$
+\dot{q} = J^T x = \begin{bmatrix} -0.1 & 0.1 \\ -0.1 & 0 \end{bmatrix} \begin{bmatrix} 0.3053 \\ -3.3588 \end{bmatrix} \approx \begin{bmatrix} -0.3664 \\ -0.0305 \end{bmatrix}
+$$
+
+Both entries are well inside the $\pm 2$ clip.
+
+**Step 4, update.** $q \leftarrow q + 0.1\,\dot{q} = (-0.0366,\ 1.5677)$. Forward kinematics now gives $p \approx (0.1039,\ 0.0963)$, so the error has dropped from 2.83 cm to 2.29 cm. Repeating the loop, the error falls below 1 mm after **16 iterations**, at $q \approx (-0.172,\ 1.533)$.
+
+Each iteration only removes part of the error. That is the role of $k_p \cdot dt = 0.2$: the solver takes cautious steps along a linearization that is only valid locally.
+
+### Worked Example: Why the Damping Matters
+
+Now put the same arm almost fully stretched, $q = (0,\ 0.01)$, and ask it to move 1 cm further **outward** along $x$, a direction it can barely move in. The Jacobian is
+
+$$
+J \approx \begin{bmatrix} -0.001 & -0.001 \\ 0.2 & 0.1 \end{bmatrix}
+$$
+
+with singular values $0.2236$ and $0.00045$, so the matrix is nearly singular. Compare the two solvers for the same error $k_p e = (0.02,\ 0)$:
+
+| Method | $\dot{q}$ (rad/s) |
+| --- | --- |
+| Plain inverse, $J^{-1} k_p e$ | $(20.0,\ -40.0)$ |
+| Damped least squares, $\lambda = 10^{-3}$ | $(0.0035,\ -0.0082)$ |
+
+The plain inverse asks for a joint velocity of 40 rad/s to gain one centimeter, a step that would throw the arm into a completely different configuration. DLS sees that the direction is nearly unreachable and takes a tiny, safe step instead. In SVD terms, the gain along a singular direction with singular value $\sigma$ changes from $1/\sigma$ (which blows up as $\sigma \to 0$) to $\sigma / (\sigma^2 + \lambda)$ (which goes to 0).
+
+### Theoretical Questions
+
+**1. If you increase the width of the lemniscate (increasing $a$), what issue can happen with IK?**
+
+A larger $a$ pushes keypoints towards the edge of (or outside) the reachable workspace, so the arm approaches a stretched, near-singular configuration or its joint limits. IK then converges slowly or fails: the warning is printed and a residual error remains. The singularity example above shows why: near the boundary, DLS deliberately takes tiny steps.
+
+**2. What can happen if you change the `dt` parameter in IK?**
+
+`dt` is the step size of the update $q \leftarrow q + \dot{q}\,dt$. A `dt` that is too large overshoots and can oscillate or diverge, while one that is too small converges very slowly and may hit `max_iters` before reaching the target. In the two-link example, $k_p \cdot dt = 0.2$ needed 16 iterations, and halving `dt` would roughly double that.
+
+**3. What are the advantages and disadvantages of our numerical IK compared to an analytical solver?**
+
+The numerical solver is **general**: it only needs the Jacobian, so it works for any kinematic chain, and it is easy to implement. But it is iterative and slower, depends on the initial guess, returns only one local solution and may not converge near singularities. An analytical solver is fast and exact and gives all solutions, but it must be derived by hand for each specific robot geometry and only exists for some kinematic structures.
+
+**4. What are the limits of our IK solver compared to state-of-the-art IK solvers?**
+
+Our solver only tracks position (no orientation), ignores joint limits, self-collisions and obstacles, uses a fixed damping and step size, and handles a single task. State-of-the-art solvers (for example Pinocchio, mink and TRAC-IK) formulate IK as a constrained optimization (a QP) with joint and velocity limits, collision avoidance, multiple weighted or prioritized tasks, and random restarts to escape local minima.
+
+## Exercise 2: Trajectory Generation and PID Control
+
+This exercise adds what Exercise 1 was missing: the motion **between** keypoints. First we generate waypoints that give smooth movement, then we define a control law that produces the torques to follow them.
+
+### Quintic Time Scaling
+
+Between two keypoints we use
+
+$$
+s(\tau) = 10\tau^3 - 15\tau^4 + 6\tau^5, \qquad \tau \in [0, 1]
+$$
+
+and each waypoint is $p(\tau) = p_{start} + (p_{end} - p_{start})\,s(\tau)$. Since $s(0) = 0$ and $s(1) = 1$, and both the first and second derivatives are zero at the two ends, the robot starts and stops each segment with zero velocity and zero acceleration. The motion is smooth, with no jerks. Each waypoint is then converted to joint angles with the IK solver from Exercise 1.
+
+**Worked example.** The scripts use 5 waypoints per segment, so $\tau \in \{0,\ 0.25,\ 0.5,\ 0.75,\ 1\}$:
+
+| $\tau$ | 0 | 0.25 | 0.5 | 0.75 | 1 |
+| --- | --- | --- | --- | --- | --- |
+| $s(\tau)$ | 0 | 0.1035 | 0.5 | 0.8965 | 1 |
+
+For $\tau = 0.25$: $10(0.015625) - 15(0.003906) + 6(0.000977) = 0.15625 - 0.05859 + 0.00586 = 0.1035$.
+
+Applied to the segment from keypoint 0, $(0.3,\ 0.25,\ 0.25)$, to keypoint 1, $(0.3,\ 0.2015,\ 0.3271)$, the waypoints are:
+
+| $\tau$ | $y$ (m) | $z$ (m) |
+| --- | --- | --- |
+| 0 | 0.2500 | 0.2500 |
+| 0.25 | 0.2450 | 0.2580 |
+| 0.5 | 0.2257 | 0.2886 |
+| 0.75 | 0.2065 | 0.3191 |
+| 1 | 0.2015 | 0.3271 |
+
+The first and last steps cover only about 10% of the distance each, while the middle two cover about 40% each: the arm eases in, cruises, and eases out. The speed profile is $\dot{s}(\tau) = 30\tau^2 - 60\tau^3 + 30\tau^4$, which peaks at $\dot{s}(0.5) = 1.875$, so the top speed is 1.875 times the average speed of the segment.
+
+<video
+  src="/images/robot-control-practice/quintic_waypoints.mp4"
+  controls
+  muted
+  loop
+  playsInline
+  style={{ width: '100%', maxWidth: 560 }}
+/>
+
+### PID Control
+
+A PID controller computes the joint torques from the tracking error $e = q_{desired} - q_{current}$:
+
+$$
+u = K_P\,e_t + K_I \sum_k e_k\,\Delta t + K_D\,\frac{e_t - e_{t-1}}{\Delta t}
+$$
+
+The **P** term pushes towards the target in proportion to the error. The **I** term accumulates past errors to remove a constant offset. The **D** term reacts to how fast the error changes and acts as damping. The defaults are $K_P = 150$, $K_I = 0$ and $K_D = 0.01$, and the output is written to `data.ctrl`. In this torque-controlled model each motor has a gear ratio of 50 and a control range of $[-100, 100]$, so the joint torque is $50\,u$.
+
+**Worked example.** Suppose a joint's error was $0.052$ rad at the previous step and is $0.050$ rad now, with $\Delta t = 0.002$ s:
+
+$$
+\begin{aligned}
+P &= 150 \times 0.050 = 7.5 \\
+D &= 0.01 \times \frac{0.050 - 0.052}{0.002} = 0.01 \times (-1.0) = -0.01 \\
+u &= 7.5 + 0 - 0.01 = 7.49
+\end{aligned}
+$$
+
+The error is shrinking, so the D term brakes slightly. The control saturates at $|u| = 100$, which the P term alone reaches once $|e| > 100 / 150 \approx 0.67$ rad (about 38 degrees). That is why a smooth reference matters: a step-like jump to a far keypoint would immediately saturate the motors.
+
+<video
+  src="/images/robot-control-practice/pid_tracking.mp4"
+  controls
+  muted
+  loop
+  playsInline
+  style={{ width: '100%', maxWidth: 560 }}
+/>
+
+### Worked Example: Gravity Sag and When $K_I$ Matters
+
+A PD controller can only hold a joint against gravity if there is a non-zero error to generate the holding torque. At equilibrium, $K_P \cdot \text{gear} \cdot e_{ss} = \tau_{gravity}$, so the steady-state error is
+
+$$
+e_{ss} = \frac{\tau_{gravity}}{K_P \cdot \text{gear}}
+$$
+
+Evaluating the model at the home pose $q = (0,\ -1.57,\ 1.0,\ 1.0,\ 0,\ 0.022)$, MuJoCo reports gravity torques of about $0.50$ N·m on the shoulder (Pitch) and $0.41$ N·m on the Elbow. For the shoulder:
+
+- With the default $K_P = 150$: $e_{ss} = 0.50 / (150 \times 50) \approx 6.7 \times 10^{-5}$ rad, only about 0.004 degrees. The stiffness is so high that the sag is invisible.
+- With a soft $K_P = 1$: $e_{ss} = 0.50 / 50 \approx 0.010$ rad, about 0.58 degrees. Now the sag is visible, and a non-zero $K_I$ is needed to remove it.
+
+So the need for $K_I$ depends on how stiff the loop already is. With very high gains, gravity is crushed by the P term, but in exchange the loop is closer to oscillation and saturation.
+
+### Theoretical Questions
+
+To get a feeling for the choice of the PID gains, we test different settings and analyze how they influence waypoint tracking.
+
+**1. If you keep increasing $K_P$, what issue arises when tracking the waypoints?**
+
+A larger $K_P$ makes the response faster and stiffer, but the joints overshoot the waypoints and oscillate around them. With very large values the system becomes unstable and the torques saturate (as computed above, $|u|$ hits 100 at about 0.67 rad of error with the default gain, and earlier with a higher one).
+
+**2. How does $K_D$ mitigate the effect you saw above when increasing $K_P$?**
+
+$K_D$ adds a term proportional to the rate of change of the error, which opposes fast motion like a damper. It slows the joint down as it approaches the target and reduces the overshoot and oscillation caused by a high $K_P$.
+
+**3. In what scenarios is a non-zero $K_I$ needed for the controller to perform well?**
+
+$K_I$ is needed when a constant disturbance causes a steady-state error, for example gravity acting on the shoulder and elbow, friction, or a payload. A P(D) controller needs a non-zero error to produce the holding torque, so the arm sags slightly below the target, while the integral term keeps growing until that offset is removed. The gravity sag example shows that this is most noticeable when $K_P$ is moderate or low.
+
+## Exercise 3: Training a Policy for Waypoint Tracking
+
+In this exercise we move to simulating a **Markov Decision Process (MDP)** and train a **reinforcement learning (RL)** policy to track randomly chosen targets. The pipeline changes and has the following structure:
+
+1. **Observation**: the environment builds a state vector (robot and target) and sends it to the policy.
+2. **Action prediction**: the PPO policy outputs a normalized action in $[-1, 1]$ for every joint at 10 Hz (every 0.1 s).
+3. **Action processing**: the action is converted to target joint positions within the joint limits.
+4. **Simulation**: the targets are written to `data.ctrl`, and MuJoCo's position actuators turn them into torques.
+5. **Reward**: after the physics steps, the new end-effector error is measured, the reward is computed and the new observation is returned.
+
+**Worked example (rates).** The simulator runs at $1 / 0.002 = 500$ Hz and the policy at $1 / 0.1 = 10$ Hz, so each policy step spans $500 / 10 = 50$ physics steps. An episode lasts 10 s, which is $10 / 0.1 = 100$ policy decisions (and 5,000 physics steps).
+
+Compared to Exercise 2, the PPO policy replaces the whole spline + IK + PID pipeline: it directly decides the next joint targets from the current state, and the low-level tracking is done by MuJoCo's built-in position controllers.
+
+The codebase already provides most of the structure. The parts we define are how to reset an episode, the observation, how we process the action and how to compute the reward.
+
+### Reset
+
+`reset_robot` adds uniform noise in $[-0.5, 0.5]$ rad to the default joint positions, so every episode starts from a different configuration and the policy does not overfit to a single start pose. `reset_target_position` samples an offset with $x \in [0.2, 0.4]$, $y \in [-0.2, 0.2]$ and $z \in [0.1, 0.4]$ (meters) and adds it to the base position, so the targets always lie in front of the robot inside its reachable workspace.
+
+### Observation
+
+In MuJoCo, all states are given in the **world frame**. We should not feed them to the policy directly, because the policy would then depend on where the robot is placed in the world: if the base is moved or rotated, the same task produces different numbers and the policy fails. So we express everything relative to the arm base (the **base frame**), which makes the observation invariant to the robot's absolute pose.
+
+We know the current end-effector position `ee_pos_w` and the base position `base_pos_w`, both in the world frame, so we can compute the offset vector `ee_pos_w - base_pos_w`. This vector is still expressed along the world axes, so we rotate it into the base frame. The columns of `base_rot_w` are the base axes written in world coordinates, so multiplying by its transpose takes the dot product with each base axis. That gives the components of the vector along the base $x$, $y$ and $z$ axes:
+
+```python
+ee_pos_base = base_rot_w.T @ (ee_pos_w - base_pos_w)
+target_pos_base = base_rot_w.T @ (target_pos_w - base_pos_w)
+```
+
+The second piece is the end-effector (gripper) **orientation**, that is, how it is rotated relative to the base.
+
+We represent orientations with unit quaternions $q = (w, x, y, z)$: four numbers that describe a 3D rotation by an angle $\theta$ around an axis $n$, with $w = \cos(\theta/2)$ and $(x, y, z) = \sin(\theta/2)\,n$. A quaternion is more compact than a $3 \times 3$ rotation matrix, and unlike Euler angles it has no singularities (gimbal lock), which makes it a good network input.
+
+```python
+base_quat_w = rot_mat_to_quat(base_rot_w)
+ee_quat_w = rot_mat_to_quat(ee_rot_w)
+ee_quat_base = quat_normalize(quat_mul(quat_conjugate(base_quat_w), ee_quat_w))
+```
+
+The first two lines convert the rotation matrices of the base and the end-effector (both in the world frame) into quaternions. In the last line:
+
+- `quat_conjugate(q)` $= (w, -x, -y, -z)$ flips the rotation axis. For a unit quaternion this is the inverse rotation, so `conj(base_quat_w)` undoes the base rotation (world to base).
+- `quat_mul` is the Hamilton product, which composes two rotations. `conj(q_base) * q_ee` means: take the end-effector orientation in the world, then undo the base rotation. The result is the end-effector orientation relative to the base. This is the quaternion version of $R_{base}^T R_{ee}$, the same idea as the position transform above.
+- The final normalization removes small floating-point errors so that the result is still a valid unit quaternion.
+
+**Worked example (position).** Suppose the base sits at $(0.5,\ 0,\ 0)$ and is rotated 90 degrees about $z$ (the SO-100 model's base is in fact mounted with a 90-degree yaw), and the end-effector is at $(0.5,\ 0.3,\ 0.2)$ in the world:
+
+$$
+R_{base} = \begin{bmatrix} 0 & -1 & 0 \\ 1 & 0 & 0 \\ 0 & 0 & 1 \end{bmatrix}
+$$
+
+$$
+p_{base} = R_{base}^T \begin{bmatrix} 0 \\ 0.3 \\ 0.2 \end{bmatrix} = \begin{bmatrix} 0.3 \\ 0 \\ 0.2 \end{bmatrix}
+$$
+
+In the world, the end-effector is "0.3 m along $+y$". From the robot's point of view it is "0.3 m straight ahead along its own $x$ axis", which is exactly what the policy should see no matter how the base is placed.
+
+**Worked example (orientation).** The base yaw of 90 degrees is $q_{base} = (\cos 45^\circ, 0, 0, \sin 45^\circ) = (0.7071,\ 0,\ 0,\ 0.7071)$. Let the end-effector have a world yaw of 135 degrees: $q_{ee} = (\cos 67.5^\circ, 0, 0, \sin 67.5^\circ) = (0.3827,\ 0,\ 0,\ 0.9239)$. Write a quaternion as a scalar $w$ plus a vector $v$. The Hamilton product is
+
+$$
+\begin{aligned}
+w &= w_1 w_2 - v_1 \cdot v_2 \\
+v &= w_1 v_2 + w_2 v_1 + v_1 \times v_2
+\end{aligned}
+$$
+
+With $\text{conj}(q_{base}) = (0.7071,\ 0,\ 0,\ -0.7071)$:
+
+$$
+\begin{aligned}
+w &= 0.2706 + 0.6533 = 0.9239 \\
+z &= 0.6533 - 0.2706 = 0.3827
+\end{aligned}
+$$
+
+where $0.2706 = 0.7071 \times 0.3827$ and $0.6533 = 0.7071 \times 0.9239$. The cross product is zero because both rotation axes are $z$. The result $(0.9239,\ 0,\ 0,\ 0.3827)$ is a 45-degree yaw: $135^\circ - 90^\circ$, the end-effector's heading relative to the base, as expected.
+
+The final **16-D observation** is `[qpos (6), ee_pos_base (3), ee_quat_base (4), target_pos_base (3)]`. The policy sees where the joints are, where and how the end-effector is, and where the target is, all relative to the base.
+
+### Action Processing
+
+The policy outputs a normalized action in $[-1, 1]$ for every joint. We clip it (the Gaussian policy can sample outside that range) and map it linearly onto each joint range, so $-1$ is the lower limit, $0$ the midpoint and $1$ the upper limit. The resulting target joint positions are written to `data.ctrl`. Normalizing the action space keeps the policy output on the same scale for every joint, and the mapping guarantees that the targets never exceed the joint limits.
+
+```python
+action = np.clip(action, -1.0, 1.0)
+low, high = jnt_range[:, 0], jnt_range[:, 1]
+# -1 -> low, 0 -> midpoint, 1 -> high
+target_qpos = low + (action + 1.0) * 0.5 * (high - low)
+return target_qpos
+```
+
+**Worked example.** Using the SO-100 joint ranges from the model file:
+
+| Joint | Range (rad) | Action | Target (rad) |
+| --- | --- | --- | --- |
+| Rotation | $[-1.92,\ 1.92]$ | $0.0$ | $0.000$ |
+| Pitch | $[-3.32,\ 0.174]$ | $0.5$ | $-0.700$ |
+| Elbow | $[-0.174,\ 3.14]$ | $-1.0$ | $-0.174$ |
+| Wrist Pitch | $[-1.66,\ 1.66]$ | $1.0$ | $1.660$ |
+| Wrist Roll | $[-2.79,\ 2.79]$ | $0.2$ | $0.558$ |
+| Jaw | $[-0.174,\ 1.75]$ | $1.4 \to 1.0$ | $1.750$ |
+
+For Pitch: $-3.32 + (0.5 + 1) \times 0.5 \times (0.174 + 3.32) = -3.32 + 0.75 \times 3.494 = -0.700$. For Jaw, the sampled $1.4$ is first clipped to $1.0$, so the target lands exactly on the upper limit instead of past it.
+
+The position actuators that track these targets have $k_p = 50$ and a force limit of $\pm 3.5$ N·m, so they saturate whenever a joint is more than $3.5 / 50 = 0.07$ rad (about 4 degrees) away from its target. A policy that jumps between distant targets is therefore always torque-limited, which is part of why its motion looks less smooth than the spline-based pipeline.
+
+### Reward
+
+The **dense** part $e^{-2d}$ ($d$ = end-effector tracking error in meters) gives a smooth signal at every step that grows as the end-effector gets closer, so the policy always knows which direction is better. The **sparse** part adds a bonus of 1 only when the error is below 5 mm, which rewards precise tracking near the target, where the dense term is almost flat.
+
+```python
+dense_reward = np.exp(-2.0 * ee_tracking_error)
+sparse_reward = 1.0 if ee_tracking_error < 0.005 else 0.0
+reward = dense_reward + sparse_reward
+return reward
+```
+
+**Worked example.** The table makes "almost flat" concrete:
+
+| Error $d$ | Dense $e^{-2d}$ | Sparse | Total |
+| --- | --- | --- | --- |
+| 10 cm | 0.8187 | 0 | 0.8187 |
+| 5 cm | 0.9048 | 0 | 0.9048 |
+| 1.02 cm | 0.9798 | 0 | 0.9798 |
+| 6 mm | 0.9881 | 0 | 0.9881 |
+| 4 mm | 0.9920 | 1 | 1.9920 |
+| 1.6 mm | 0.9968 | 1 | 1.9968 |
+
+Going from 10 cm to 5 cm gains about $0.086$ dense reward, but going from 1 cm to 4 mm gains only about $0.012$. Near the target the dense term barely distinguishes "close" from "precise". Crossing the 5 mm line, by contrast, almost doubles the reward. That jump is the only strong incentive for millimeter-level accuracy.
+
+### Results
+
+<video
+  src="/images/robot-control-practice/ppo_waypoint_tracking.mp4"
+  controls
+  muted
+  loop
+  playsInline
+  style={{ width: '100%', maxWidth: 560 }}
+/>
+
+And the final end-effector tracking error over 10 evaluation episodes:
+
+<img
+  src="/images/robot-control-practice/Screenshot_2026-10-21_at_6.41.22_PM.png"
+  alt="Final end-effector tracking errors of ten evaluation episodes, ranging from 0.0015 m to 0.0492 m, with an average of 0.0102 m."
+  width={588}
+  height={334}
+/>
+
+The average is $0.0102$ m, about 1 cm, but the distribution is very uneven. Seven of the ten episodes end within 5 mm of the target (1.5, 1.6, 2.4, 2.4, 2.7, 3.3 and 4.9 mm), inside the sparse-bonus zone. One more ends at 6.2 mm, and the remaining two are outliers at 2.8 cm and 4.9 cm. Without the two outliers, the remaining eight errors add up to 25.0 mm, so their mean is $25.0 / 8 \approx 3.1$ mm. The average is dominated by a few targets the policy does not reach at all, likely ones near the edge of the sampled workspace, rather than by general imprecision.
+
+## Insights on Robot Control
+
+Looking at the three exercises together, a robot controller is a stack of layers, each answering a different question:
+
+1. **Motion planning / trajectory generation** (Exercise 2, quintic spline): where should the end-effector be at each moment? It turns a few keypoints into a smooth, time-parameterized path.
+2. **Inverse kinematics** (Exercise 1): which joint angles put the end-effector at that point? This is pure geometry (kinematics); it knows nothing about mass, gravity or torque.
+3. **Low-level feedback control** (Exercise 2, PID): which torques make the joints actually reach those angles? This is where dynamics (inertia, gravity, friction) come in.
+
+Some observations from the exercises:
+
+- **Kinematics is not control.** In Exercise 1 the arm only looks correct because the joints are teleported. As soon as real dynamics are involved (Exercise 2), we need a controller, and the result depends heavily on its gains.
+- **Smooth references make control easier.** The quintic spline gives zero velocity and acceleration at both ends of each segment, so the PID never has to follow a jump. A step-like reference with a high $K_P$ is exactly what causes overshoot, oscillation and, as the saturation calculation showed, motors pinned at their limits.
+- **Every gain is a trade-off.** $K_P$ trades speed for overshoot, $K_D$ trades overshoot for sluggishness and noise sensitivity, and $K_I$ removes steady-state error (such as gravity sag) but can cause windup and slow oscillations. No setting is best everywhere; gains are tuned for one operating range.
+- **Different layers run at different rates.** In Exercise 3 the policy decides at 10 Hz while MuJoCo simulates at 500 Hz, and in between a built-in position controller ($k_p = 50$, critically damped, torque limited to 3.5 N·m) tracks the policy's joint targets. The fast inner loop handles stabilization; the slow outer loop handles the decision.
+- **RL did not remove the PD controller.** The policy outputs joint position targets, and a PD-type actuator still converts them into torques. RL replaced the planning and IK layers, not the low-level feedback loop. This is the same structure most learned controllers on real robots use. It also means the policy is trained for this specific actuator: changing $k_p$ or `dampratio` changes the dynamics, and the policy has to be retrained.
+- **Frames matter for learning.** Expressing the observation in the base frame makes the policy invariant to where the robot stands, so it generalizes instead of memorizing world coordinates.
+
+## Why Use RL If PID Can Already Control the Arm?
+
+PID answers only one question: *given a reference, how do I track it?* It needs someone else to provide that reference, and in Exercise 2 that was the hand-designed spline plus the IK solver. For a simple, fully known task like moving a free arm through keypoints, this classical pipeline works very well. In our results it is even more precise (mm-level error) and smoother than the RL policy (cm-level average error).
+
+The real question is what happens when the reference is hard to design. That is where RL helps:
+
+1. **RL optimizes the task, not a reference.** We only specify the goal through a reward (get close to the target). The policy figures out the joint motion itself, so we need neither a hand-written trajectory nor a separate IK solver.
+2. **It handles problems where the classical pipeline is hard to build.** Legged locomotion, contact-rich manipulation (pushing, inserting, in-hand rotation) and underactuated systems involve contacts and switching dynamics. Writing a correct reference trajectory and a stable controller for every situation is very difficult, while RL can learn the behavior in simulation.
+3. **It is nonlinear and coordinates all joints.** PID controls each joint independently with fixed linear gains tuned for one operating range. A neural network policy maps the full state to all joints at once and can behave differently in different regions of the state space.
+4. **It can be robust to uncertainty.** By training with randomized masses, friction, delays or noise (domain randomization), the policy learns to work across a range of dynamics, while a PID tuned for one model may degrade when the real robot differs.
+5. **It can use rich observations.** A policy can take camera images, contact forces or the history of states as input. A PID only sees an error signal.
+6. **It is cheap at run time.** One forward pass of a small network replaces iterative IK (up to 2,000 iterations per waypoint in Exercise 1; 16 even in the easy two-link example) and online planning.
+
+### The Costs of RL
+
+- It needs a lot of interaction data (here about 1M steps) and therefore a simulator.
+- The sim-to-real gap: a policy that works in simulation can fail on hardware if the simulation is not accurate enough.
+- There are no stability or safety guarantees, and the behavior is hard to interpret or debug. PID is well understood and can be analyzed.
+- Precision and smoothness have to be engineered into the reward (for example a sharper distance reward, or penalties on action changes and joint velocities). Otherwise, as seen here, the motion can be jerky and less accurate; the reward table shows how little the dense term rewards the last few millimeters.
+- The policy is tied to its training setup: changing the actuator gains, the robot or the task usually means retraining.
+
+## Closing Thoughts
+
+RL and PID are not really competitors. In practice they are combined: the RL policy acts as the high-level decision maker at a low rate (10 to 50 Hz), and a PD/PID loop tracks its outputs at a high rate, which is exactly the structure of Exercise 3. Use the classical pipeline when the task and the model are well known and precision or guarantees matter. Use RL when the desired behavior is hard to specify by hand, the dynamics involve contacts or uncertainty, or the controller must react to rich sensory input.
+
+Working through the numbers made this concrete for me. One DLS step only shaves a few millimeters off the error, a nearly stretched arm makes a plain inverse ask for 40 rad/s, a 150-gain PID makes gravity sag disappear, and a reward of $e^{-2d}$ can barely tell 1 cm from 4 mm. Each of these small calculations explains a behavior that the videos only show.
