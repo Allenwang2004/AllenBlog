@@ -1,0 +1,168 @@
+---
+title: Imitation Learning practice
+description: "Teleoperating an SO-101 arm, training an MLP action-chunking policy with MSE loss, and using DAgger and targeted data collection to fix low success rates and out-of-distribution failures."
+descriptionEn: "Teleoperating an SO-101 arm, training an MLP action-chunking policy with MSE loss, and using DAgger and targeted data collection to fix low success rates and out-of-distribution failures."
+slug: imitation-learning-practice-post
+date: 2026-10-22
+type: Post
+image: /images/imitation_learning.jpg
+language: en
+---
+
+This homework walks through the main parts of a modern imitation learning pipeline. I teleoperate a simulated **SO-101** arm to record expert demonstrations, train a policy to imitate the expert actions, and then push the success rate up during evaluation. The task is to pick up a red cube, move it around a wall-shaped obstacle, and drop it into a bin.
+
+The post has three parts: how the data is collected and what the policy looks like, the two exercises (plain behavior cloning, then DAgger), and a closer look at the loss function. I train with a plain **MSE loss**, so the policy predicts the *mean* action, not a *distribution* over actions. That choice explains both why this setup works here and where it will stop working.
+
+## Collecting Expert Data
+
+The first step is recording expert demonstrations by teleoperating the arm with the keyboard. At first this took me a lot of time, because the default camera angle was pretty weird and it was hard to judge depth. After I changed the camera angle, teleoperating the arm became much easier.
+
+Each recorded step stores the simulator state. The actions are then computed as differences between consecutive states, $a_t = s_{t+1} - s_t$. I use end-effector control, so an action is the change of the end-effector position plus a gripper command.
+
+## Policy Architecture
+
+The policy is a simple MLP action-chunking policy:
+
+- **Input (12-dim state):** end-effector position (3), gripper angle (1), cube position plus the first two quaternion components (5), and obstacle position (3). Every dimension is normalized with the mean and std of the training data.
+- **Network:** fully connected layers of width 256 with ReLU (5 hidden layers for Exercise 1, 6 for Exercise 2), followed by a linear output layer.
+- **Output:** an action chunk of the next 16 steps. Each step is 4-dim: the change of the end-effector position $(dx, dy, dz)$ and the gripper command. At evaluation time the robot executes the whole chunk before predicting the next one.
+- **Loss:** MSE between the predicted and the recorded action chunk.
+- **Training:** AdamW (lr $10^{-3}$, weight decay $10^{-4}$), cosine learning-rate schedule, 200 epochs, batch size 256. For every configuration I train 5 models with seeds 0 to 4.
+
+Predicting a **chunk** of 16 actions instead of a single action is a cheap but effective trick. The policy commits to a short motion segment, so small per-step errors have fewer chances to pile up, and the motion is smoother than re-deciding at every step.
+
+## The Task Scenario
+
+Before training, let's look at the scenario. The obstacle (the blue wall) can appear in three zones along the $x$ axis:
+
+<img
+  src="/images/imitation-learning-practice/obstacle-zones.png"
+  alt="The three obstacle zones rendered in simulation: minus zone with the obstacle at x = -0.30, center zone at x = -0.22, and plus zone at x = -0.14. The cube, the bin and the robot start in the same place in all three."
+  width={720}
+  height={196}
+/>
+
+In Exercise 1 the evaluation only uses the **center zone**. In Exercise 2 the evaluation uses **all three zones**, so the policy also has to handle obstacle positions it never saw in my teleop data.
+
+## Exercise 1: Behavior Cloning in the Center Zone
+
+Here is the first result of Exercise 1. I trained 5 models with different seeds and evaluated each one with the official evaluation (100 episodes, seed 42):
+
+<img
+  src="/images/imitation-learning-practice/Screenshot_2026-10-22_at_3.00.48_PM.png"
+  alt="Exercise 1 evaluation over 100 episodes: seed0 70%, seed1 77% (best), seed2 74%, seed3 71%, seed4 75%."
+  width={520}
+  height={150}
+/>
+
+The best model reaches 77%, but full marks require a success rate of 85%. So I used **DAgger** (Dataset Aggregation) to collect more data. In DAgger the policy runs on its own, and whenever it starts to fail, the human expert takes over and records the correct actions from that state. These corrections cover exactly the states the policy actually reaches, which plain teleop demos tend to miss. I modified the codebase so that I only collect DAgger episodes in the center zone, since that is the only zone Exercise 1 is evaluated on.
+
+Here is the result after adding the DAgger data:
+
+<img
+  src="/images/imitation-learning-practice/Screenshot_2026-10-22_at_3.21.11_PM.png"
+  alt="Exercise 1 evaluation after adding DAgger data: seed0 88% (best), seed1 65%, seed2 69%, seed3 36%, seed4 75%. Best score 100/100."
+  width={640}
+  height={110}
+/>
+
+The best seed reaches 88%, which gives full points for this exercise.
+
+### Why Do the Seeds Differ So Much?
+
+The spread between seeds is huge, from 36% to 88% with the same data and the same hyperparameters. At first I thought the main reason was the train/validation split: the seed decides which samples go into the validation set, and with DAgger data in the mix it matters a lot whether the few DAgger corrections end up in training or get "wasted" in validation.
+
+To be more precise, the seed changes three things at once: the initial weights, the order of the mini-batches, and which 10% of the samples go to the validation set. The split is not the only source of the variance. Even when I trained on the teleop data only, three seeds gave 61%, 73% and 67%. Two changes came out of this:
+
+- **Validation uses teleop data only.** When DAgger data is present, the validation set is sampled only from the original teleop episodes, and all DAgger samples are always used for training. This way no DAgger correction is wasted in the validation set.
+- **Model selection by success rate, not by validation loss.** The validation loss does not track the success rate in simulation, so the best-validation checkpoint of a seed is not necessarily a good policy. Instead I evaluate all 5 seeds with the official evaluation (100 episodes, seed 42) and submit the one with the highest success rate.
+
+The second point deserves an explanation. The validation loss measures how close the predicted actions are to the expert's actions, **on states taken from the expert's own trajectories**. The success rate measures what happens when the policy runs **closed-loop**: every small error moves the robot into a slightly different state, the next prediction is made from that state, and errors compound. This mismatch between the training distribution and the states the policy visits is called covariate shift, and it is exactly the problem DAgger is designed to address. A low open-loop MSE says little about whether the policy recovers from its own mistakes.
+
+## Exercise 2: DAgger Across All Three Zones
+
+Before collecting anything new, it helps to see how the Exercise 1 policy behaves in the Exercise 2 evaluation. The plot below shows its end-effector paths from a top-down view:
+
+<img
+  src="/images/imitation-learning-practice/rollouts-before.png"
+  alt="Top-down end-effector paths of the Exercise 1 checkpoint in the Exercise 2 evaluation. Minus zone 0/41 success, center zone 13/17, plus zone 0/42. In the minus and plus zones every failure is 'never lifted': the arm wanders near the start or toward the bin without reaching the cube."
+  width={720}
+  height={299}
+/>
+
+In the center zone it still works (13/17), but in the minus and plus zones it succeeds **0 times out of 83**, and in every failure the cube is never lifted. The arm drifts away from the cube toward places that make no sense. This is a textbook **out-of-distribution (OOD)** failure: the obstacle position is part of the input, and all training data had the obstacle at $x = -0.22$. When the obstacle is at $-0.30$ or $-0.14$, the network has to extrapolate, and an MLP's extrapolation is essentially arbitrary.
+
+So for Exercise 2 I used DAgger again, this time in all zones. The first result was pretty bad:
+
+<img
+  src="/images/imitation-learning-practice/Screenshot_2026-10-22_at_3.43.35_PM.png"
+  alt="First Exercise 2 evaluation: seed0 41%, seed1 51% (best), seed2 25%, seed3 26%, seed4 24%."
+  width={520}
+  height={151}
+/>
+
+The best seed only reaches 51%. To find out why, I plotted the end-effector paths in the training data, split by obstacle zone:
+
+<img
+  src="/images/imitation-learning-practice/training-data-paths.png"
+  alt="Top-down view of end-effector paths in the training data. Minus zone: 0 teleop and 7 DAgger demos, going straight up past the wall on the right. Center zone: 21 teleop and 4 DAgger demos, detouring left around the wall. Plus zone: 0 teleop and 9 DAgger demos. The path around the wall is different in every zone."
+  width={720}
+  height={288}
+/>
+
+The problem is **data imbalance**. All of my teleop demos are in the center zone, so the minus and plus zones are covered only by DAgger demos. And the correct path is different in every zone: in the center zone the arm has to detour left around the wall, while in the minus zone the wall is out of the way on the left and the arm can go almost straight to the bin. With too few demos in the outer zones, the policy has not learned the outer-zone behavior well enough. So I collected more DAgger data specifically for the **minus and plus zones**, trained five new policies and evaluated them again:
+
+<img
+  src="/images/imitation-learning-practice/Screenshot_2026-10-22_at_6.05.16_PM.png"
+  alt="Exercise 2 evaluation after collecting more minus and plus zone data: seed0 43%, seed1 65%, seed2 86% (best), seed3 41%, seed4 47%. Best score 100/100."
+  width={640}
+  height={111}
+/>
+
+The best seed now reaches 86% and gets full points. The top-down view of the new policy shows where the gain comes from:
+
+<img
+  src="/images/imitation-learning-practice/rollouts-after.png"
+  alt="Top-down end-effector paths of the new checkpoint in the Exercise 2 evaluation. Minus zone 34/41 success, center zone 14/17, plus zone 38/42. Successful paths in each zone follow the zone-specific route from the training data."
+  width={720}
+  height={299}
+/>
+
+Compared to the first Exercise 2 run, the minus zone goes from 17/41 to 34/41 and the plus zone from 21/42 to 38/42, while the center zone barely changes (13/17 to 14/17). The extra data went exactly where the policy was out of distribution, and that is where the improvement shows up. Each zone now follows its own route, the same route as in the demonstrations.
+
+## A Closer Look at the Loss: MSE Predicts the Mean
+
+One thing I want to highlight is that this whole homework uses only an **MSE loss**:
+
+$$
+\mathcal{L}(\theta) = \mathbb{E}_{(s, a) \sim \mathcal{D}} \left[ \left\| a - f_\theta(s) \right\|^2 \right]
+$$
+
+For a fixed state $s$, the prediction that minimizes this loss is the **conditional mean** of the expert's actions:
+
+$$
+f^*(s) = \mathbb{E}[\, a \mid s \,]
+$$
+
+You can see this by expanding the loss for a single state: $\mathbb{E}\|a - c\|^2 = \|c - \mathbb{E}[a]\|^2 + \mathrm{Var}(a)$, and the variance term does not depend on the prediction $c$, so the best choice is $c = \mathbb{E}[a]$. Equivalently, MSE is maximum likelihood under a Gaussian $\mathcal{N}(f_\theta(s), \sigma^2 I)$ with fixed variance. So an MSE policy implicitly assumes that, for every state, the expert's actions form **one unimodal blob**, and it outputs the center of that blob. It does not learn the **distribution** of actions, so it cannot represent the fact that there may be several equally good ways to act.
+
+### Why That Is a Problem in General
+
+Imagine the expert reaches a wall and goes around it on the left in half of the demos and on the right in the other half. The conditional mean of "go left" and "go right" is "go straight", which drives the arm right into the wall. The averaged action is not just suboptimal; it may not be a valid action at all. This is the **mode averaging** problem, and it is the main weakness of MSE behavior cloning whenever the demonstrations are **multimodal**.
+
+### Why MSE Works in This Task
+
+In this homework, MSE was good enough to reach full points, for a few reasons:
+
+- **The obstacle position is in the input.** In each zone there is basically one correct route, and the network can tell the zones apart from the obstacle position. The multimodality across zones (left detour in the center zone, straight path in the minus zone) is resolved by conditioning, so for a given state the expert's action is close to unimodal.
+- **A single, consistent expert.** All demos come from me, with one strategy per zone. The plot of the training data shows how tightly the center-zone teleop demos follow the same detour.
+- **Action chunking.** Predicting 16 steps at once makes the policy commit to a whole motion segment, so it is less likely to flip between strategies from one step to the next.
+- **Averaging can even help.** Human teleoperation is noisy (small overshoots, pauses, jitter). Predicting the mean smooths that noise out, which is a useful side effect when the noise is just noise and not a different strategy.
+
+Even here there are hints of the limit. In the plus zone, some of my DAgger demos take a wide loop to the left while others go almost straight up. When the data contains two styles like this from similar states, an MSE policy can only output something in between them. That is fine as long as "in between" is still collision-free, but there is no guarantee that it is.
+
+## Closing Thoughts
+
+The main lessons from this homework were about data rather than the network. A small MLP was enough, but only after the data covered the states the policy actually visits. DAgger fixed the center-zone failures in Exercise 1. In Exercise 2, collecting targeted data for the under-represented minus and plus zones turned an OOD failure (0/83 outside the center zone) into a policy that succeeds in most episodes in every zone. I also learned to choose models by closed-loop success rate instead of validation loss, and not to trust a single seed.
+
+The MSE loss is the part that will not carry over. It works here because each state has essentially one correct action. The next exercise is a **multi-goal** problem: three cubes and a randomized bin, with the policy told which cube to pick. There, the demonstrations become much more multimodal, and averaging between modes becomes a real risk. For that problem I will switch from MSE to **flow matching**, which learns the full distribution of action chunks. Instead of regressing one action, it learns a velocity field that transforms Gaussian noise into an action chunk step by step, so at test time the policy *samples* one valid mode instead of averaging them. I will show how this works, and how it compares to the MSE policy, in the next blog.
