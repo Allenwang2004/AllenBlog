@@ -1,9 +1,9 @@
 ---
 title: Imitation Learning practice
-description: "Teleoperating an SO-101 arm, training an MLP action-chunking policy with MSE loss, and using DAgger and targeted data collection to fix low success rates and out-of-distribution failures."
-descriptionEn: "Teleoperating an SO-101 arm, training an MLP action-chunking policy with MSE loss, and using DAgger and targeted data collection to fix low success rates and out-of-distribution failures."
+description: "Teleoperating an SO-101 arm, training an MLP action-chunking policy with MSE loss, using DAgger and targeted data collection to fix low success rates and out-of-distribution failures, and turning a multi-cube, goal-conditioned task into a single-target problem."
+descriptionEn: "Teleoperating an SO-101 arm, training an MLP action-chunking policy with MSE loss, using DAgger and targeted data collection to fix low success rates and out-of-distribution failures, and turning a multi-cube, goal-conditioned task into a single-target problem."
 slug: imitation-learning-practice-post
-date: 2026-10-22
+date: 2026-11-03
 type: Post
 image: /images/imitation_learning.jpg
 language: en
@@ -11,7 +11,7 @@ language: en
 
 This homework walks through the main parts of a modern imitation learning pipeline. I teleoperate a simulated **SO-101** arm to record expert demonstrations, train a policy to imitate the expert actions, and then push the success rate up during evaluation. The task is to pick up a red cube, move it around a wall-shaped obstacle, and drop it into a bin.
 
-The post has three parts: how the data is collected and what the policy looks like, the two exercises (plain behavior cloning, then DAgger), and a closer look at the loss function. I train with a plain **MSE loss**, so the policy predicts the *mean* action, not a *distribution* over actions. That choice explains both why this setup works here and where it will stop working.
+The post has four parts: how the data is collected and what the policy looks like, the first two exercises (plain behavior cloning, then DAgger), a closer look at the loss function, and the multi-cube, goal-conditioned task of Exercise 3. I train with a plain **MSE loss**, so the policy predicts the *mean* action, not a *distribution* over actions. That choice explains both why this setup works here and where it will stop working.
 
 ## Collecting Expert Data
 
@@ -161,8 +161,99 @@ In this homework, MSE was good enough to reach full points, for a few reasons:
 
 Even here there are hints of the limit. In the plus zone, some of my DAgger demos take a wide loop to the left while others go almost straight up. When the data contains two styles like this from similar states, an MSE policy can only output something in between them. That is fine as long as "in between" is still collision-free, but there is no guarantee that it is.
 
+## Exercise 3: A Multi-Cube, Goal-Conditioned Policy
+
+The last exercise is the hardest one. There are now **three cubes** (red, green and blue) and a bin, and both the cube positions and the bin position are randomized at the start of every episode. The policy is told which color to pick through a one-hot goal vector, and it has to put that cube into the bin. The README warns that a success rate approaching 50% is already very strong.
+
+### Breaking Down the Problem
+
+As in Exercise 2, I started by listing what the scene can actually look like instead of recording right away. The randomization turns out to be much smaller than it sounds. There are only four slots along the $y$ axis ($y = 0.35, 0.45, 0.55, 0.70$), and the three cubes plus the bin always fill all four of them. Once the target cube sits in one slot, the bin can only be in one of the other three. That gives $4 \times 3 = 12$ combinations in total:
+
+<img
+  src="/images/imitation-learning-practice/multitask-layouts.png"
+  alt="Top-down view of the 12 combinations of target slot and bin slot in the multicube scene. In 6 of them the target and the bin are neighbours, in 4 the arm passes over one other cube, and in 2 it passes over two other cubes."
+  width={720}
+  height={643}
+/>
+
+The combinations are not equally hard. In 6 of them the target and the bin are neighbours, in 4 the arm has to carry the cube over one other cube, and in 2 it passes over two.
+
+The second observation was about the colors. There is no vision in this task, since the policy only sees positions, so red, green and blue are just three labels for three positions. The robot does exactly the same thing whichever color is the target: pick up the cube at the target position and drop it into the bin. If I feed all three cube positions plus the one-hot vector into the network, the network first has to learn to read the one-hot and pick the matching position before it can learn anything about grasping. That is an extra problem it would have to solve from a small dataset.
+
+So I solve that part myself, before the network. The one-hot vector simply selects the target position:
+
+$$
+p_\text{target} = g_\text{red}\, p_\text{red} + g_\text{green}\, p_\text{green} + g_\text{blue}\, p_\text{blue}
+$$
+
+For a green target, $g = (0, 1, 0)$, so $p_\text{target} = 0 \cdot p_\text{red} + 1 \cdot p_\text{green} + 0 \cdot p_\text{blue} = p_\text{green}$. The MLP then only sees **one** target position, together with the end-effector, the gripper and the bin, and the colors never reach it. The network is the same MLP action-chunking policy with MSE loss as before.
+
+This has a nice side effect: "red target at $y = 0.35$" and "green target at $y = 0.35$" become exactly the same input, so every demonstration trains all three colors at once. I only recorded red-target demos. To check that this really works, I compared colors within the same layout on the first model. For example, with the target in slot 1 and the bin in slot 2, red succeeds 19/20, green 13/15 and blue 10/10.
+
+It also connects back to the loss discussion above. Selecting the target before the network removes one source of multimodality: for a given input there is again essentially one correct action, which is exactly the condition under which MSE works.
+
+### Covering Every Layout
+
+The color problem is gone, but the distribution is still more complex than in the earlier exercises, because the route depends on where the target and the bin are. To get a high success rate from limited data, every one of the 12 combinations needs to show up in the demonstrations. A random layout per episode would cover some combinations several times and miss others, so I changed the recorder to step through the 12 combinations in order and only move on after an episode is saved. I recorded three rounds, so **36 demos**, exactly 3 per combination.
+
+The first model, trained on these 36 demos, gave this result:
+
+<img
+  src="/images/imitation-learning-practice/multitask-first-result.png"
+  alt="First Exercise 3 evaluation over 100 episodes: seed0 52% (best), seed1 50%, seed2 49%, seed3 48%, seed4 51%."
+  width={417}
+  height={123}
+/>
+
+All five seeds land around 50% (48 to 52%), already at the level the README calls very strong. But these numbers were too consistent to be bad luck, so I looked at how the failures happen.
+
+### Why the Policy Never Lets Go
+
+About 90% of the failures look the same. The cube is picked up and carried to within 1 to 2 cm of the bin center, and then the arm just **hovers** there until the 800-step limit. The gripper never opens.
+
+The grasping and carrying part works, so the problem is the release. The reason turned out to be in my own demonstrations: **pauses during teleoperation**. When I teleoperate with the keyboard, there are many short moments where I am not pressing anything. Each of those moments is recorded as a step where the arm does not move and the gripper command does not change. Across all demos, **53%** of the recorded steps are idle like this.
+
+<img
+  src="/images/imitation-learning-practice/multitask-idle-steps.png"
+  alt="Left: one teleop demo (episode 30), with arm motion per step and gripper command over time; long shaded stretches are idle steps, including most of the time the cube is held over the bin. Right: across all 36 demos, 739 of 1048 steps (71%) with the cube held over the bin are idle; after dropping idle steps only the 309 moving or gripper-opening steps remain."
+  width={720}
+  height={446}
+/>
+
+The left side shows one demo: long shaded stretches where nothing happens, including most of the time the cube is over the bin. The right side counts this over all 36 demos. While holding the cube over the bin, **739 of 1048 steps (71%)** are idle. So in exactly the state where the policy should release, the label it sees most often is "stay still, keep holding". The "open" label shows up for only a few steps.
+
+This would not be a problem if the policy knew how long it had been waiting, but the state only contains positions. Two states, "just arrived over the bin" and "have been waiting here for a while", look identical. The policy is trained to predict the mean of the labels, and in that state the mean is dominated by "stay still". So it learns to hover. In the MSE section I said that averaging out teleop noise can help. Here the pauses are not random noise around a motion; they are a systematic label that outweighs the one action that matters.
+
+The fix needs no new data: drop the idle transitions before training. Steps where the gripper is opening or closing are kept, and the arm path does not change, because idle steps have zero motion anyway. The dataset shrinks from 10186 to 4757 transitions, and over the bin only the 309 steps that actually do something remain.
+
+### Result
+
+The video shows the same evaluation episode (green target in slot 1, bin in slot 0) for both models. On top, the model trained with the pauses carries the cube to the bin and then hovers without releasing it. Below, the model trained without the pauses drops the cube into the bin at step 112.
+
+<video
+  src="/images/imitation-learning-practice/multitask-idle-before-after.mp4"
+  controls
+  muted
+  loop
+  playsInline
+  style={{ width: '100%', maxWidth: 640 }}
+/>
+
+With the same 36 demos and the same model size (256 x 6), only the idle steps removed, every seed improves:
+
+<img
+  src="/images/imitation-learning-practice/multitask-idle-per-seed.png"
+  alt="Exercise 3 success rate per seed over 100 evaluation episodes. With pauses: 52, 50, 49, 48, 51% (mean 50%). Pauses removed: 60, 62, 64, 71, 70% (mean 65%). Improvements of +8, +12, +15, +23 and +19 points."
+  width={640}
+  height={389}
+/>
+
+The gain ranges from 8 to 23 points per seed, the mean goes from **50% to 65%**, and the best seed reaches **71%** (seed 3). Unlike Exercises 1 and 2, the seeds are also close to each other, both before and after the fix. The data, not the initialization, was setting the ceiling.
+
 ## Closing Thoughts
 
-The main lessons from this homework were about data rather than the network. A small MLP was enough, but only after the data covered the states the policy actually visits. DAgger fixed the center-zone failures in Exercise 1. In Exercise 2, collecting targeted data for the under-represented minus and plus zones turned an OOD failure (0/83 outside the center zone) into a policy that succeeds in most episodes in every zone. I also learned to choose models by closed-loop success rate instead of validation loss, and not to trust a single seed.
+The main lessons from this homework were about data rather than the network. A small MLP was enough in all three exercises, but only after the data covered the states the policy actually visits. DAgger fixed the center-zone failures in Exercise 1. In Exercise 2, collecting targeted data for the under-represented minus and plus zones turned an OOD failure (0/83 outside the center zone) into a policy that succeeds in most episodes in every zone. I also learned to choose models by closed-loop success rate instead of validation loss, and not to trust a single seed.
 
-The MSE loss is the part that will not carry over. It works here because each state has essentially one correct action. The next exercise is a **multi-goal** problem: three cubes and a randomized bin, with the policy told which cube to pick. There, the demonstrations become much more multimodal, and averaging between modes becomes a real risk. For that problem I will switch from MSE to **flow matching**, which learns the full distribution of action chunks. Instead of regressing one action, it learns a velocity field that transforms Gaussian noise into an action chunk step by step, so at test time the policy *samples* one valid mode instead of averaging them. I will show how this works, and how it compares to the MSE policy, in the next blog.
+Exercise 3 added two more lessons. First, break the problem down before collecting data: listing the layouts showed there are only 12 of them, and noticing that the colors do not matter without vision let me remove the goal-reading problem from the network entirely, so that every demo counts for all three colors. Second, look at *how* the policy fails, not just how often. The hovering failure looked like a model problem, but it came from my own pauses during teleoperation, and removing them raised the mean success rate from 50% to 65% without recording a single new demo.
+
+The MSE loss carried through all three exercises, because in each of them I could arrange things so that a state has essentially one correct action: the obstacle position separates the zones, and the target selection removes the colors. That will not always be possible. When the demonstrations contain several valid ways to solve the same state, MSE averages between them. The natural next step is **flow matching**, which learns the full distribution of action chunks. Instead of regressing one action, it learns a velocity field that transforms Gaussian noise into an action chunk step by step, so at test time the policy *samples* one valid mode instead of averaging them. I want to try it on this multi-cube task and compare it with the MSE policy in a future post.
